@@ -1,0 +1,243 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ──────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  SUPER_ADMIN
+  OWNER
+  CREATIVO
+  TRAFFICKER
+  VIEWER
+}
+
+enum CampaignType {
+  EVERGREEN
+  ESTACIONAL
+}
+
+enum CampaignStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  LIVE
+  FINISHED
+}
+
+enum PieceEstado {
+  ACTIVA
+  RESERVA
+}
+
+enum TaskStatus {
+  PENDIENTE
+  EN_PRODUCCION
+  EN_REVISION
+  APROBADO
+  PUBLICADO
+  RECHAZADO
+}
+
+// ─── MODELS ─────────────────────────────────────────────────────────────────
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logo      String?
+  plan      String   @default("trial")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  campaigns Campaign[]
+  aiUsage   AiUsage[]
+
+  @@map("workspaces")
+}
+
+model User {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  name        String
+  password    String?
+  role        UserRole  @default(VIEWER)
+  workspaceId String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace        Workspace?       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdCampaigns Campaign[]       @relation("CampaignCreator")
+  auditLogs        AuditLog[]
+  comments         Comment[]
+  assignedPieces   Piece[]          @relation("PieceAssignee")
+
+  @@map("users")
+}
+
+model Campaign {
+  id          String         @id @default(cuid())
+  workspaceId String
+  createdById String
+
+  name             String
+  tipo             CampaignType
+  eventoEstacional String?
+  status           CampaignStatus @default(DRAFT)
+  currentStep      Int            @default(1)
+
+  // Paso 2: brief
+  brief      Json?
+  // Paso 3: oferta
+  oferta     Json?
+  // Paso 4: modelos seleccionados
+  modelos    Json?
+  // Paso 5: estructura Meta Ads (objetivo, ABO/CBO, modo)
+  estructura Json?
+  // Paso 6: presupuesto y fechas
+  presupuesto Json?
+  // Paso 7: equipo
+  equipo     Json?
+
+  promptMaestro String?
+  promptVersion String  @default("v1.0")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy User              @relation("CampaignCreator", fields: [createdById], references: [id])
+  adSets    AdSet[]
+  auditLogs AuditLog[]
+  versions  CampaignVersion[]
+  comments  Comment[]
+
+  @@map("campaigns")
+}
+
+model AdSet {
+  id         String @id @default(cuid())
+  campaignId String
+
+  nombre                String
+  publico               String?
+  porcentajePresupuesto Int?
+  orden                 Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  pieces   Piece[]
+
+  @@map("ad_sets")
+}
+
+model Piece {
+  id         String @id @default(cuid())
+  adSetId    String
+  assigneeId String?
+
+  estado     PieceEstado @default(ACTIVA)
+  taskStatus TaskStatus  @default(PENDIENTE)
+
+  // Sub-paso 1: esencial
+  modelo    String?
+  tipoPieza String?
+  trafico   String?
+  angulo    String?
+  conciencia String?
+  motivo    String?
+  narrativa String?
+
+  // Sub-paso 2: formato y copy
+  estructuraCopy String?
+  formato        String?
+  duracion       String?
+  carruselSlides Int?
+
+  // Contenido generado por IA
+  guionGenerado String?
+  copyGenerado  String?
+  aiGeneratedAt DateTime?
+
+  // Archivo subido (S3)
+  archivoUrl    String?
+  archivoKey    String?
+  archivoBucket String?
+
+  orden     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  adSet    AdSet    @relation(fields: [adSetId], references: [id], onDelete: Cascade)
+  assignee User?    @relation("PieceAssignee", fields: [assigneeId], references: [id])
+  comments Comment[]
+
+  @@map("pieces")
+}
+
+model CampaignVersion {
+  id         String   @id @default(cuid())
+  campaignId String
+  version    Int
+  snapshot   Json
+  createdAt  DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@map("campaign_versions")
+}
+
+model Comment {
+  id         String   @id @default(cuid())
+  campaignId String?
+  pieceId    String?
+  userId     String
+  content    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  campaign Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  piece    Piece?    @relation(fields: [pieceId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id])
+
+  @@map("comments")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  campaignId String?
+  userId     String
+  action     String
+  diff       Json?
+  createdAt  DateTime @default(now())
+
+  campaign Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  user     User      @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model AiUsage {
+  id           String  @id @default(cuid())
+  workspaceId  String
+  campaignId   String?
+  pieceId      String?
+  inputTokens  Int
+  outputTokens Int
+  model        String
+  action       String
+  costUsd      Float?
+  createdAt    DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("ai_usage")
+}
