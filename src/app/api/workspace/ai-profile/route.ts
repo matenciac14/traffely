@@ -1,6 +1,16 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db/prisma"
+import { z } from "zod"
+
+const aiProfileSchema = z.object({
+  descripcionEmpresa: z.string().max(2000).optional(),
+  publicoObjetivo: z.string().max(2000).optional(),
+  tonoMarca: z.string().max(1000).optional(),
+  propuestasValorFijas: z.string().max(2000).optional(),
+  palabrasProhibidas: z.string().max(1000).optional(),
+  instruccionesExtra: z.string().max(2000).optional(),
+})
 
 export async function GET() {
   const session = await auth()
@@ -24,9 +34,13 @@ export async function PATCH(req: Request) {
 
   try {
     const body = await req.json()
+    const result = aiProfileSchema.safeParse(body)
+    if (!result.success) {
+      return NextResponse.json({ error: "Datos inválidos", details: result.error.flatten() }, { status: 400 })
+    }
     await db.workspace.update({
       where: { id: session.user.workspaceId },
-      data: { aiProfile: body },
+      data: { aiProfile: result.data },
     })
     return NextResponse.json({ ok: true })
   } catch {
