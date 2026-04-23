@@ -12,6 +12,8 @@ import {
 } from "../../../constants/campaign-data"
 import { cn } from "@/lib/utils"
 import type { TipoOferta } from "../../../types"
+import ShopifyProductPicker from "../ShopifyProductPicker"
+import type { ShopifyProductSimple } from "@/lib/integrations/shopify/client"
 
 type StringField = "ofertaMetodosPago" | "ofertaRegalo" | "ofertaGarantia" | "ofertaCambios" | "ofertaEnvio"
 
@@ -63,6 +65,22 @@ export default function Step3Oferta() {
 
   const chips = tipoOferta ? (CHIPS_DETALLE_POR_OFERTA[tipoOferta] ?? []) : []
 
+  function handleShopifyProduct(product: ShopifyProductSimple) {
+    // Pre-fill oferta fields con el primer producto/variante
+    const variant = product.variants[0]
+    let detalle = product.title
+    if (variant && variant.price) {
+      const precio = `$${parseFloat(variant.price).toLocaleString("es-CO")}`
+      const antes = variant.compareAtPrice
+        ? ` (antes $${parseFloat(variant.compareAtPrice).toLocaleString("es-CO")})`
+        : ""
+      detalle = `${product.title} — ${precio}${antes}`
+    }
+    if (product.description) detalle += `\n${product.description}`
+    setField("contextoOferta", detalle)
+    if (!tipoOferta) setTipoOferta("producto" as TipoOferta)
+  }
+
   function toggleChip(field: StringField, val: string, current: string) {
     const parts = current ? current.split(", ").filter(Boolean) : []
     if (parts.includes(val)) {
@@ -79,6 +97,9 @@ export default function Step3Oferta() {
         <h2 className="text-xl font-semibold text-foreground">Oferta de la campaña</h2>
         <p className="text-sm text-muted-foreground mt-1">¿Con qué promoción vas a salir al mercado?</p>
       </div>
+
+      {/* Importar desde Shopify */}
+      <ShopifyProductPicker mode="product" onSelectProduct={handleShopifyProduct} />
 
       {/* Tipo oferta */}
       <div className="space-y-3">

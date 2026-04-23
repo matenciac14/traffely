@@ -84,6 +84,21 @@ Workspace → AiUsage
 - **S3**: bucket privado — usar siempre presigned URLs para upload (PUT, 15min) y preview (GET, 1hr)
 - **API keys workspace**: cifrar con AES-256-GCM antes de guardar en DB (`lib/utils/crypto.ts`)
 
+## Integración Shopify (Fase 10)
+- **Objetivo**: catálogo read-only para importar productos/variantes en el wizard
+- **Modelo DB**: `ShopifyIntegration` (workspaceId unique, shop, accessToken cifrado AES-256-GCM, scope, isActive)
+- **OAuth**: `POST /api/integrations/shopify/connect` → URL → Shopify → `GET /api/integrations/shopify/callback`
+- **Estado/desconectar**: `GET|DELETE /api/integrations/shopify`
+- **Productos on-demand**: `GET /api/integrations/shopify/products` → llama API Shopify en tiempo real
+- **Scope**: `read_products` únicamente — sin acceso a pedidos, clientes ni escritura
+- **Env vars**: `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET` (crear App privada en Shopify Partners)
+- **State OAuth**: in-memory Map con TTL 10min (MVP — migrar a Redis si hay multi-instancia)
+- **Uso en wizard**:
+  - Step 3 Oferta: `ShopifyProductPicker` → pre-fill `contextoOferta` con nombre + precio
+  - Step 4 Modelos: `ShopifyProductPicker` → importa variantes como modelos con precios
+- **UI Settings**: tab "Shopify" en `/settings?tab=shopify` — solo OWNER/SUPER_ADMIN
+- **Sin sync en background**: los productos se leen en tiempo real, no se guardan en DB
+
 ## IA — Generación de brief
 - Endpoint: `POST /api/campaigns/[id]/generate` → SSE stream
 - Modelo: `claude-opus-4-6`, `max_tokens: 16000`

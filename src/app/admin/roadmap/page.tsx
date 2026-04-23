@@ -144,6 +144,23 @@ const ROADMAP: { fase: string; status: "done" | "in-progress" | "pending"; items
       { label: "Piezas auto-creadas en Step 5 heredan modelo seleccionado en Step 4", done: true },
     ],
   },
+  {
+    fase: "Fase 10 — Integración Shopify (catálogo read-only)",
+    status: "in-progress" as const,
+    items: [
+      { label: "Modelo ShopifyIntegration en Prisma (workspaceId, shop, accessToken cifrado)", done: true },
+      { label: "OAuth flow: connect (POST) + callback (GET) con HMAC validation", done: true },
+      { label: "API status GET + disconnect DELETE (/api/integrations/shopify)", done: true },
+      { label: "API productos on-demand GET (/api/integrations/shopify/products)", done: true },
+      { label: "Lib Shopify: client (paginación REST) + hmac validation", done: true },
+      { label: "Settings tab 'Shopify': conectar, ver estado, desconectar", done: true },
+      { label: "ShopifyProductPicker: componente reutilizable con búsqueda", done: true },
+      { label: "Step 3 Oferta: importar producto Shopify → pre-fill contextoOferta", done: true },
+      { label: "Step 4 Modelos: importar variantes Shopify → modelos con precios", done: true },
+      { label: "Crear Shopify App privada y configurar SHOPIFY_API_KEY + SHOPIFY_API_SECRET", done: false },
+      { label: "Probar OAuth end-to-end con tienda real", done: false },
+    ],
+  },
 ]
 
 const STATUS_STYLE = {

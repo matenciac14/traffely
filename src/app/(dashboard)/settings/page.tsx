@@ -6,8 +6,10 @@ import AiKeyForm from "./AiKeyForm"
 import BillingSection from "./BillingSection"
 import TeamSection from "./TeamSection"
 import MetaAccountForm from "./MetaAccountForm"
+import ShopifySettings from "./ShopifySettings"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
+import { Suspense } from "react"
 
 export default async function SettingsPage({
   searchParams,
@@ -38,6 +40,7 @@ export default async function SettingsPage({
     ...(isOwner ? [{ key: "api-keys", label: "API Keys" }] : []),
     ...(isOwner ? [{ key: "billing",  label: "Facturación" }] : []),
     ...(workspace?.metaEnabled ? [{ key: "meta", label: "Meta Ads" }] : []),
+    ...(isOwner ? [{ key: "shopify", label: "Shopify" }] : []),
   ]
 
   return (
@@ -134,6 +137,17 @@ export default async function SettingsPage({
           ? <MetaAccountForm initialAccountId={workspace?.metaAdAccountId ?? null} />
           : <div className="bg-muted/40 rounded-2xl border border-border p-5 text-center text-sm text-muted-foreground">
               Solo el propietario puede configurar la integración con Meta.
+            </div>
+      )}
+
+      {/* Tab: Shopify */}
+      {tab === "shopify" && (
+        isOwner
+          ? <Suspense fallback={<div className="text-sm text-muted-foreground p-5 animate-pulse">Cargando…</div>}>
+              <ShopifySettings />
+            </Suspense>
+          : <div className="bg-muted/40 rounded-2xl border border-border p-5 text-center text-sm text-muted-foreground">
+              Solo el propietario puede configurar integraciones.
             </div>
       )}
     </div>

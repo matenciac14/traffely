@@ -91,9 +91,10 @@ model Workspace {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users     User[]
-  campaigns Campaign[]
-  aiUsage   AiUsage[]
+  users             User[]
+  campaigns         Campaign[]
+  aiUsage           AiUsage[]
+  shopifyIntegration ShopifyIntegration?
 
   @@map("workspaces")
 }
@@ -304,6 +305,22 @@ model AiUsage {
   @@index([workspaceId])
   @@index([campaignId])
   @@map("ai_usage")
+}
+
+model ShopifyIntegration {
+  id          String    @id @default(cuid())
+  workspaceId String    @unique
+  shop        String                          // "mitienda.myshopify.com"
+  accessToken String                          // cifrado AES-256-GCM
+  scope       String
+  isActive    Boolean   @default(true)
+  lastSyncAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("shopify_integrations")
 }
 
 model Notification {
