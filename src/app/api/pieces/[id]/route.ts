@@ -1,0 +1,105 @@
+import { NextResponse } from "next/server"
+import { auth } from "@/lib/auth/config"
+import { db } from "@/lib/db/prisma"
+
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth()
+  if (!session?.user?.workspaceId) return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+
+  const { id } = await params
+
+  const piece = await db.piece.findFirst({
+    where: { id, adSet: { campaign: { workspaceId: session.user.workspaceId } } },
+    select: {
+      id: true,
+      modelo: true, tipoPieza: true, formato: true, duracion: true,
+      angulo: true, trafico: true, conciencia: true, motivo: true, narrativa: true,
+      estructuraCopy: true, estado: true, taskStatus: true,
+      guionGenerado: true, copyGenerado: true, aiGeneratedAt: true,
+      archivoUrl: true, archivoKey: true,
+      priority: true, dueDate: true, adUrl: true,
+      createdAt: true, updatedAt: true,
+      adSet: { select: { nombre: true, campaign: { select: { id: true, name: true } } } },
+      assignee: { select: { id: true, name: true } },
+      comments: {
+        select: { id: true, content: true, createdAt: true, user: { select: { id: true, name: true } } },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  })
+
+  if (!piece) return NextResponse.json({ error: "No encontrado" }, { status: 404 })
+  return NextResponse.json(piece)
+}
+
+const TASK_STATUSES = ["PENDIENTE", "EN_PRODUCCION", "EN_REVISION", "APROBADO", "PUBLICADO", "RECHAZADO"] as const
+
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth()
+  if (!session?.user?.workspaceId) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+  }
+
+  const { id } = await params
+
+  // Verify piece belongs to workspace
+  const piece = await db.piece.findFirst({
+    where: { id, adSet: { campaign: { workspaceId: session.user.workspaceId } } },
+    select: { id: true, taskStatus: true, assigneeId: true },
+  })
+  if (!piece) return NextResponse.json({ error: "Pieza no encontrada" }, { status: 404 })
+
+  const body = await req.json()
+  const data: Record<string, unknown> = {}
+
+  if (body.taskStatus !== undefined) {
+    if (!TASK_STATUSES.includes(body.taskStatus)) {
+      return NextResponse.json({ error: "Estado inválido" }, { status: 400 })
+    }
+    data.taskStatus = body.taskStatus
+  }
+
+  if (body.adUrl !== undefined) {
+    data.adUrl = body.adUrl ? String(body.adUrl).slice(0, 2048) : null
+  }
+
+  if (body.priority !== undefined) {
+    const validPriorities = ["BAJA", "MEDIA", "ALTA", "URGENTE"]
+    if (body.priority !== null && !validPriorities.includes(body.priority)) {
+      return NextResponse.json({ error: "Prioridad inválida" }, { status: 400 })
+    }
+    data.priority = body.priority
+  }
+
+  if (body.dueDate !== undefined) {
+    data.dueDate = body.dueDate ? new Date(body.dueDate) : null
+  }
+
+  if (body.assigneeId !== undefined) {
+    if (body.assigneeId === null) {
+      data.assigneeId = null
+    } else {
+      // Verify assignee belongs to same workspace
+      const assignee = await db.user.findFirst({
+        where: { id: body.assigneeId, workspaceId: session.user.workspaceId },
+        select: { id: true },
+      })
+      if (!assignee) return NextResponse.json({ error: "Usuario no encontrado" }, { status: 400 })
+      data.assigneeId = body.assigneeId
+    }
+  }
+
+  const updated = await db.piece.update({
+    where: { id },
+    data,
+    select: { id: true, taskStatus: true, assigneeId: true, assignee: { select: { id: true, name: true } } },
+  })
+
+  return NextResponse.json(updated)
+}

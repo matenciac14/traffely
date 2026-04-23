@@ -19,8 +19,15 @@ export default auth((req) => {
 
   const role = req.auth.user?.role
 
+  // /admin solo para SUPER_ADMIN
   if (SUPER_ADMIN_ROUTES.some((r) => pathname.startsWith(r)) && role !== "SUPER_ADMIN") {
     return NextResponse.redirect(new URL("/campaigns", req.url))
+  }
+
+  // /campaigns y /board bloqueados para SUPER_ADMIN
+  const CLIENT_ROUTES = ["/campaigns", "/board", "/settings"]
+  if (CLIENT_ROUTES.some((r) => pathname.startsWith(r)) && role === "SUPER_ADMIN") {
+    return NextResponse.redirect(new URL("/admin", req.url))
   }
 
   return NextResponse.next()

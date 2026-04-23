@@ -7,17 +7,52 @@ import {
   ANGULOS_BASE, NARRATIVAS_BASE, TIPOS_PIEZA, FORMATOS, ESTRUCTURAS_COPY,
   PUBLICOS, DURACIONES_VIDEO,
 } from "../../../constants/campaign-data"
+import type { Piece } from "../../../types"
 import { cn } from "@/lib/utils"
-import { PlusIcon, TrashIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react"
+import { PlusIcon, TrashIcon, ChevronDownIcon, ChevronUpIcon, AlertCircleIcon } from "lucide-react"
+
+// ── Validation helper ────────────────────────────────────────────────────────
+
+function getMissingFields(p: Piece): string[] {
+  const missing: string[] = []
+  if (!p.modelo) missing.push("modelo")
+  if (!p.tipoPieza) missing.push("tipoPieza")
+  if (!p.trafico) missing.push("trafico")
+  if (!p.angulo) missing.push("angulo")
+  if (!p.conciencia) missing.push("conciencia")
+  if (!p.motivo) missing.push("motivo")
+  if (!p.narrativa) missing.push("narrativa")
+  if (!p.estructuraCopy) missing.push("estructuraCopy")
+  if (!p.formato) missing.push("formato")
+  const esVideo = p.tipoPieza?.toLowerCase().includes("video")
+  if (esVideo && !p.duracion) missing.push("duracion")
+  return missing
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  modelo: "Modelo",
+  tipoPieza: "Tipo de pieza",
+  trafico: "Tráfico",
+  angulo: "Ángulo",
+  conciencia: "Conciencia",
+  motivo: "Motivo",
+  narrativa: "Narrativa",
+  estructuraCopy: "Estructura copy",
+  formato: "Formato",
+  duracion: "Duración",
+}
 
 // ── Piece editor ────────────────────────────────────────────────────────────
 
-function PiezaEditor({ ci, cji, pi }: { ci: number; cji: number; pi: number }) {
-  const { campanas, updatePiezaField } = useCampaignWizard()
+function PiezaEditor({ ci, cji, pi, showErrors }: { ci: number; cji: number; pi: number; showErrors: boolean }) {
+  const { campanas, updatePiezaField, modelosSeleccionados, modelosCustom } = useCampaignWizard()
   const pieza = campanas[ci]?.conjuntos[cji]?.piezas[pi]
   if (!pieza) return null
 
   const esVideo = pieza.tipoPieza?.toLowerCase().includes("video")
+  const missing = showErrors ? getMissingFields(pieza) : []
+
+  const allModelos = [...modelosSeleccionados, ...modelosCustom]
 
   function setCustom(field: string, val: string) {
     updatePiezaField(ci, cji, pi, "_customs", { ...pieza._customs, [field]: val })
@@ -25,7 +60,7 @@ function PiezaEditor({ ci, cji, pi }: { ci: number; cji: number; pi: number }) {
 
   function fieldChips(
     label: string,
-    field: keyof typeof pieza,
+    fieldKey: keyof typeof pieza,
     options: readonly string[] | readonly { nombre: string; icon?: string; desc?: string }[],
     hasCustom?: string
   ) {
@@ -35,17 +70,24 @@ function PiezaEditor({ ci, cji, pi }: { ci: number; cji: number; pi: number }) {
       ? (options as { nombre: string; icon?: string; desc?: string }[]).map((o) => ({ label: o.nombre, icon: o.icon, desc: o.desc, val: o.nombre }))
       : (options as string[]).map((o) => ({ label: o, val: o }))
 
-    const current = pieza[field] as string
+    const current = pieza[fieldKey] as string
     const customVal = hasCustom ? (pieza._customs?.[hasCustom] ?? "") : ""
+    const isMissing = missing.includes(fieldKey as string)
 
     return (
       <div className="space-y-1.5">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</p>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex items-center gap-1.5">
+          <p className={cn(
+            "text-xs font-semibold uppercase tracking-wide",
+            isMissing ? "text-destructive" : "text-muted-foreground"
+          )}>{label}</p>
+          {isMissing && <AlertCircleIcon className="w-3 h-3 text-destructive" />}
+        </div>
+        <div className={cn("flex flex-wrap gap-1.5 p-2 rounded-lg transition-colors", isMissing && "bg-destructive/5 border border-destructive/20")}>
           {items.map((item) => (
             <button
               key={item.val}
-              onClick={() => updatePiezaField(ci, cji, pi, field, item.val)}
+              onClick={() => updatePiezaField(ci, cji, pi, fieldKey, item.val)}
               title={item.desc}
               className={cn(
                 "px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all",
@@ -60,7 +102,7 @@ function PiezaEditor({ ci, cji, pi }: { ci: number; cji: number; pi: number }) {
           ))}
           {hasCustom && (
             <button
-              onClick={() => updatePiezaField(ci, cji, pi, field, "__custom__")}
+              onClick={() => updatePiezaField(ci, cji, pi, fieldKey, "__custom__")}
               className={cn(
                 "px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all",
                 current === "__custom__"
@@ -87,6 +129,14 @@ function PiezaEditor({ ci, cji, pi }: { ci: number; cji: number; pi: number }) {
 
   return (
     <div className="space-y-4 p-4 bg-muted/40 rounded-xl border border-border">
+      {/* Missing fields summary */}
+      {showErrors && missing.length > 0 && (
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/5 border border-destructive/20 text-xs text-destructive">
+          <AlertCircleIcon className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+          <span>Falta completar: <strong>{missing.map(f => FIELD_LABELS[f] ?? f).join(", ")}</strong></span>
+        </div>
+      )}
+
       {/* Estado */}
       <div className="flex items-center gap-2">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide w-14">Estado</p>
@@ -106,6 +156,35 @@ function PiezaEditor({ ci, cji, pi }: { ci: number; cji: number; pi: number }) {
         ))}
       </div>
 
+      {/* Modelo — primer campo, usa los modelos del Paso 4 */}
+      {allModelos.length > 0 && (() => {
+        const isMissing = missing.includes("modelo")
+        return (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <p className={cn("text-xs font-semibold uppercase tracking-wide", isMissing ? "text-destructive" : "text-muted-foreground")}>Modelo</p>
+              {isMissing && <AlertCircleIcon className="w-3 h-3 text-destructive" />}
+            </div>
+            <div className={cn("flex flex-wrap gap-1.5 p-2 rounded-lg transition-colors", isMissing && "bg-destructive/5 border border-destructive/20")}>
+              {allModelos.map((m) => (
+                <button
+                  key={m}
+                  onClick={() => updatePiezaField(ci, cji, pi, "modelo", m)}
+                  className={cn(
+                    "px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all",
+                    pieza.modelo === m
+                      ? "border-primary bg-accent text-accent-foreground"
+                      : "border-border bg-card text-foreground hover:border-primary/40"
+                  )}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
       {fieldChips("Tipo de pieza", "tipoPieza", TIPOS_PIEZA, "tipoPieza")}
       {fieldChips("Tráfico", "trafico", TIPOS_TRAFICO)}
       {fieldChips("Ángulo", "angulo", ANGULOS_BASE, "angulo")}
@@ -117,7 +196,12 @@ function PiezaEditor({ ci, cji, pi }: { ci: number; cji: number; pi: number }) {
 
       {esVideo && (
         <div className="space-y-1.5">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Duración</p>
+          <p className={cn(
+            "text-xs font-semibold uppercase tracking-wide",
+            missing.includes("duracion") ? "text-destructive" : "text-muted-foreground"
+          )}>
+            Duración {missing.includes("duracion") && <span className="inline-flex items-center gap-0.5"><AlertCircleIcon className="w-3 h-3" /></span>}
+          </p>
           <div className="flex flex-wrap gap-1.5">
             {DURACIONES_VIDEO.map((d) => (
               <button
@@ -142,14 +226,23 @@ function PiezaEditor({ ci, cji, pi }: { ci: number; cji: number; pi: number }) {
 
 // ── AdSet row ───────────────────────────────────────────────────────────────
 
-function ConjuntoRow({ ci, cji }: { ci: number; cji: number }) {
+function ConjuntoRow({ ci, cji, showErrors }: { ci: number; cji: number; showErrors: boolean }) {
   const {
     campanas, tipoPresupuesto,
     eliminarConjunto, agregarPieza, eliminarPieza,
     updateConjunto,
   } = useCampaignWizard()
   const conjunto = campanas[ci]?.conjuntos[cji]
-  const [expandedPieza, setExpandedPieza] = useState<number | null>(null)
+
+  // Auto-expand first incomplete pieza
+  const firstIncompleteIdx = showErrors
+    ? conjunto?.piezas.findIndex((p) => getMissingFields(p).length > 0) ?? -1
+    : -1
+
+  const [expandedPieza, setExpandedPieza] = useState<number | null>(
+    firstIncompleteIdx >= 0 ? firstIncompleteIdx : null
+  )
+
   if (!conjunto) return null
 
   return (
@@ -201,41 +294,51 @@ function ConjuntoRow({ ci, cji }: { ci: number; cji: number }) {
 
       {/* Piezas */}
       <div className="divide-y divide-border">
-        {conjunto.piezas.map((pieza, pi) => (
-          <div key={pieza.id}>
-            <div className="flex items-center gap-2 px-4 py-2.5">
-              <button
-                onClick={() => setExpandedPieza(expandedPieza === pi ? null : pi)}
-                className="flex-1 flex items-center gap-2 text-left hover:text-primary transition-colors"
-              >
-                <span className={cn(
-                  "w-4 h-4 rounded text-[9px] font-bold flex items-center justify-center flex-shrink-0",
-                  pieza.estado === "reserva" ? "bg-amber-100 text-amber-700" : "bg-primary/10 text-primary"
-                )}>
-                  {pi + 1}
-                </span>
-                <span className="text-xs text-foreground">
-                  {pieza.tipoPieza || "sin tipo"} · {pieza.angulo || "sin ángulo"} · <span className="capitalize">{pieza.estado}</span>
-                </span>
-                {expandedPieza === pi
-                  ? <ChevronUpIcon className="w-3.5 h-3.5 ml-auto text-muted-foreground" />
-                  : <ChevronDownIcon className="w-3.5 h-3.5 ml-auto text-muted-foreground" />
-                }
-              </button>
-              <button
-                onClick={() => eliminarPieza(ci, cji, pi)}
-                className="p-1 rounded text-muted-foreground hover:text-destructive transition-colors"
-              >
-                <TrashIcon className="w-3 h-3" />
-              </button>
-            </div>
-            {expandedPieza === pi && (
-              <div className="px-4 pb-4">
-                <PiezaEditor ci={ci} cji={cji} pi={pi} />
+        {conjunto.piezas.map((pieza, pi) => {
+          const piezaMissing = showErrors ? getMissingFields(pieza) : []
+          const hasError = piezaMissing.length > 0
+          return (
+            <div key={pieza.id}>
+              <div className="flex items-center gap-2 px-4 py-2.5">
+                <button
+                  onClick={() => setExpandedPieza(expandedPieza === pi ? null : pi)}
+                  className="flex-1 flex items-center gap-2 text-left hover:text-primary transition-colors"
+                >
+                  <span className={cn(
+                    "w-4 h-4 rounded text-[9px] font-bold flex items-center justify-center flex-shrink-0",
+                    pieza.estado === "reserva" ? "bg-amber-100 text-amber-700" : "bg-primary/10 text-primary"
+                  )}>
+                    {pi + 1}
+                  </span>
+                  <span className="text-xs text-foreground flex-1">
+                    {pieza.tipoPieza || "sin tipo"} · {pieza.angulo || "sin ángulo"} · <span className="capitalize">{pieza.estado}</span>
+                  </span>
+                  {hasError && (
+                    <span className="flex items-center gap-1 text-xs text-destructive font-medium">
+                      <AlertCircleIcon className="w-3 h-3" />
+                      {piezaMissing.length} campo{piezaMissing.length > 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {expandedPieza === pi
+                    ? <ChevronUpIcon className="w-3.5 h-3.5 ml-1 text-muted-foreground flex-shrink-0" />
+                    : <ChevronDownIcon className="w-3.5 h-3.5 ml-1 text-muted-foreground flex-shrink-0" />
+                  }
+                </button>
+                <button
+                  onClick={() => eliminarPieza(ci, cji, pi)}
+                  className="p-1 rounded text-muted-foreground hover:text-destructive transition-colors"
+                >
+                  <TrashIcon className="w-3 h-3" />
+                </button>
               </div>
-            )}
-          </div>
-        ))}
+              {expandedPieza === pi && (
+                <div className="px-4 pb-4">
+                  <PiezaEditor ci={ci} cji={cji} pi={pi} showErrors={showErrors} />
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       <div className="px-4 py-2 border-t border-border flex gap-3">
@@ -266,11 +369,20 @@ export default function Step5Estructura() {
     autoCampanas, autoConjuntos, autoPiezasXConj, autoStep,
     campanas, agregarCampana, eliminarCampana,
     agregarConjunto, crearEstructuraAuto,
-    modelosSeleccionados,
   } = useCampaignWizard()
 
+  // Track if user has tried to advance (to show errors)
+  const [triedNext, setTriedNext] = useState(false)
+
+  // Expose setter so parent page can trigger it — via a custom event
+  const handleTryNext = () => setTriedNext(true)
+
+  const hasPiezaErrors = campanas.some(c =>
+    c.conjuntos.some(cj => cj.piezas.some(p => getMissingFields(p).length > 0))
+  )
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" onClickCapture={() => {}}>
       <div>
         <h2 className="text-xl font-semibold text-foreground">Estructura Meta</h2>
         <p className="text-sm text-muted-foreground mt-1">Objetivo, presupuesto y estructura de campañas.</p>
@@ -421,7 +533,7 @@ export default function Step5Estructura() {
 
               <div className="p-3 space-y-3">
                 {campana.conjuntos.map((_, cji) => (
-                  <ConjuntoRow key={cji} ci={ci} cji={cji} />
+                  <ConjuntoRow key={cji} ci={ci} cji={cji} showErrors={triedNext} />
                 ))}
                 <button
                   onClick={() => agregarConjunto(ci)}
@@ -446,6 +558,14 @@ export default function Step5Estructura() {
           </button>
         </div>
       )}
+
+      {/* Hidden trigger for parent to activate error mode */}
+      <button
+        id="step5-try-next"
+        className="hidden"
+        onClick={handleTryNext}
+        aria-hidden
+      />
     </div>
   )
 }

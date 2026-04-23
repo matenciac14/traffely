@@ -52,6 +52,38 @@ model Workspace {
   slug      String   @unique
   logo      String?
   plan      String   @default("trial")
+  isActive  Boolean  @default(true)
+  isDeleted Boolean  @default(false)
+  deletedAt DateTime?
+
+  // Ubicación
+  country   String?
+  city      String?
+
+  // Billing (manual tracking)
+  setupFee    Float   @default(0)
+  monthlyFee  Float   @default(0)
+  billingStatus String @default("pending") // pending | paid | overdue
+
+  // Notas internas del admin
+  notes     String?
+
+  // Perfil de IA configurable por el OWNER
+  aiProfile Json?
+
+  // AI key configurable por OWNER (Fase 8)
+  aiProvider String? // anthropic | openai | gemini
+  aiApiKey   String? // clave del proveedor elegido (cifrar en prod)
+
+  // Billing info (read-only para OWNER, editado por SUPER_ADMIN)
+  billingPlan      String?  // nombre del plan (ej: "Starter", "Pro")
+  billingCycle     String?  // monthly | annual
+  nextBillingDate  DateTime?
+
+  // Integración Meta Ads (Fase 7)
+  metaEnabled     Boolean @default(false)
+  metaAdAccountId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -69,6 +101,7 @@ model User {
   password    String?
   role        UserRole  @default(VIEWER)
   workspaceId String?
+  isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -107,6 +140,8 @@ model Campaign {
 
   promptMaestro String?
   promptVersion String  @default("v1.0")
+
+  isArchived Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -171,6 +206,13 @@ model Piece {
   archivoUrl    String?
   archivoKey    String?
   archivoBucket String?
+
+  // Prioridad y fecha límite
+  priority  String?
+  dueDate   DateTime?
+
+  // Link del ad en Meta
+  adUrl     String?
 
   orden     Int      @default(0)
   createdAt DateTime @default(now())
