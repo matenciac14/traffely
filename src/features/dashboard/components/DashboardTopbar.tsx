@@ -4,6 +4,7 @@ import { signOut } from "next-auth/react"
 import { LogOutIcon, ChevronDownIcon } from "lucide-react"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
+import NotificationBell from "./NotificationBell"
 
 const ROLE_LABELS: Record<string, string> = {
   SUPER_ADMIN: "Super Admin",
@@ -23,7 +24,8 @@ export default function DashboardTopbar({ userName, userEmail, userRole }: Props
   const [open, setOpen] = useState(false)
 
   return (
-    <header className="h-12 border-b border-border bg-card flex items-center justify-end px-6 flex-shrink-0 relative">
+    <header className="h-12 border-b border-border bg-card flex items-center justify-end px-6 flex-shrink-0 relative gap-2">
+      <NotificationBell />
       {/* User menu */}
       <div className="relative">
         <button
