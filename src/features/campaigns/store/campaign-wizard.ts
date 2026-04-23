@@ -9,12 +9,12 @@ function nanoid(prefix = "P") {
   return prefix + Math.random().toString(36).substring(2, 7).toUpperCase()
 }
 
-export function newPieza(estado: "activa" | "reserva" = "activa"): Piece {
+export function newPieza(estado: "activa" | "reserva" = "activa", modelo = ""): Piece {
   return {
     id: nanoid("P"),
     estado,
     subpaso: 1,
-    modelo: "",
+    modelo,
     tipoPieza: "",
     formato: "",
     carruselSlides: 5,
@@ -281,7 +281,9 @@ export const useCampaignWizard = create<CampaignWizardState & CampaignWizardActi
 
       crearEstructuraAuto: () =>
         set((s) => {
-          const { autoMode, autoCampanas, autoConjuntos, autoPiezasXConj, autoPiezasCustom, nombreCampana, tipoPresupuesto } = s
+          const { autoMode, autoCampanas, autoConjuntos, autoPiezasXConj, autoPiezasCustom, nombreCampana, tipoPresupuesto, modelosSeleccionados, modelosCustom } = s
+          const allModelos = [...modelosSeleccionados, ...modelosCustom]
+          const defaultModelo = allModelos.length === 1 ? allModelos[0] : ""
           const baseName = nombreCampana || "Campaña"
           const campanas: CampanaWizard[] = []
 
@@ -293,7 +295,7 @@ export const useCampaignWizard = create<CampaignWizardState & CampaignWizardActi
               const nPiezas = autoMode === "quick" ? autoPiezasXConj : (autoPiezasCustom[cji] || 1)
               const conj = newConjunto(`Conjunto ${cji + 1}`)
               for (let pi = 0; pi < nPiezas; pi++) {
-                conj.piezas.push(newPieza("activa"))
+                conj.piezas.push(newPieza("activa", defaultModelo))
               }
               conjuntos.push(conj)
             }
@@ -356,9 +358,11 @@ export const useCampaignWizard = create<CampaignWizardState & CampaignWizardActi
 
       agregarPieza: (ci, cji, estado) =>
         set((s) => {
+          const allModelos = [...s.modelosSeleccionados, ...s.modelosCustom]
+          const defaultModelo = allModelos.length === 1 ? allModelos[0] : ""
           const next = [...s.campanas]
           const conjs = [...next[ci].conjuntos]
-          conjs[cji] = { ...conjs[cji], piezas: [...conjs[cji].piezas, newPieza(estado)] }
+          conjs[cji] = { ...conjs[cji], piezas: [...conjs[cji].piezas, newPieza(estado, defaultModelo)] }
           next[ci] = { ...next[ci], conjuntos: conjs }
           return { campanas: next }
         }),
