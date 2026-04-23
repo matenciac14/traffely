@@ -39,6 +39,8 @@ interface PieceDetail {
   copyGenerado: string | null
   aiGeneratedAt: string | null
   archivoUrl: string | null
+  archivoKey: string | null
+  archivoSignedUrl: string | null
   adSet: { nombre: string; campaign: { id: string; name: string } }
   assignee: { id: string; name: string } | null
   comments: Comment[]
@@ -524,24 +526,24 @@ export default function PieceDrawer({ pieceId, members, currentUserId, canAdvanc
 
                     {piece.archivoUrl ? (
                       <div className="space-y-2">
-                        {/* Inline preview */}
-                        {getFileType(piece.archivoUrl) === "image" && (
+                        {/* Inline preview usando URL firmada (bucket privado) */}
+                        {piece.archivoSignedUrl && getFileType(piece.archivoUrl) === "image" && (
                           <img
-                            src={piece.archivoUrl}
+                            src={piece.archivoSignedUrl}
                             alt="Preview"
                             className="max-h-48 w-full object-contain rounded-lg border border-border"
                           />
                         )}
-                        {getFileType(piece.archivoUrl) === "video" && (
+                        {piece.archivoSignedUrl && getFileType(piece.archivoUrl) === "video" && (
                           <video
-                            src={piece.archivoUrl}
+                            src={piece.archivoSignedUrl}
                             controls
                             className="w-full rounded-lg max-h-48"
                           />
                         )}
                         <div className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-muted/30">
                           <a
-                            href={piece.archivoUrl}
+                            href={piece.archivoSignedUrl ?? piece.archivoUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-2 text-xs text-primary hover:underline"
