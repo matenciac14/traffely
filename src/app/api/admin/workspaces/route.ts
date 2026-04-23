@@ -2,6 +2,21 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db/prisma"
 import bcrypt from "bcryptjs"
+import { z } from "zod"
+
+const createWorkspaceSchema = z.object({
+  name: z.string().min(1).max(100),
+  slug: z.string().min(1).max(60).regex(/^[a-z0-9-]+$/).optional(),
+  country: z.string().max(100).optional(),
+  city: z.string().max(100).optional(),
+  setupFee: z.number().min(0).optional(),
+  monthlyFee: z.number().min(0).optional(),
+  plan: z.string().optional(),
+  notes: z.string().optional(),
+  ownerName: z.string().min(1),
+  ownerEmail: z.string().email(),
+  ownerPassword: z.string().min(1),
+})
 
 function slugify(name: string) {
   return name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").slice(0, 50)
@@ -15,11 +30,11 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json()
-    const { name, country, city, plan, setupFee, monthlyFee, notes, ownerName, ownerEmail, ownerPassword } = body
-
-    if (!name || !ownerName || !ownerEmail || !ownerPassword) {
-      return NextResponse.json({ error: "Faltan campos obligatorios" }, { status: 400 })
+    const result = createWorkspaceSchema.safeParse(body)
+    if (!result.success) {
+      return NextResponse.json({ error: "Datos inválidos", details: result.error.flatten() }, { status: 400 })
     }
+    const { name, country, city, plan, setupFee, monthlyFee, notes, ownerName, ownerEmail, ownerPassword } = result.data
 
     const existingEmail = await db.user.findUnique({ where: { email: ownerEmail } })
     if (existingEmail) {
