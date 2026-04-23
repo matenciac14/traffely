@@ -157,8 +157,32 @@ const ROADMAP: { fase: string; status: "done" | "in-progress" | "pending"; items
       { label: "ShopifyProductPicker: componente reutilizable con búsqueda", done: true },
       { label: "Step 3 Oferta: importar producto Shopify → pre-fill contextoOferta", done: true },
       { label: "Step 4 Modelos: importar variantes Shopify → modelos con precios", done: true },
-      { label: "Crear Shopify App privada y configurar SHOPIFY_API_KEY + SHOPIFY_API_SECRET", done: false },
-      { label: "Probar OAuth end-to-end con tienda real", done: false },
+      { label: "Crear app 'Traffely' en Shopify Partners (separada de WCA)", done: false },
+      { label: "Configurar redirect URIs en Partners: traffely.com + localhost", done: false },
+      { label: "Copiar SHOPIFY_API_KEY + SHOPIFY_API_SECRET a .env.local y Vercel", done: false },
+      { label: "Probar OAuth end-to-end con tienda de desarrollo Shopify", done: false },
+    ],
+  },
+  {
+    fase: "Fase 11 — Shopify App Review (distribución pública)",
+    status: "pending" as const,
+    items: [
+      // ── Técnico (código) ─────────────────────────────────────────────────────
+      { label: "[CÓDIGO] Webhook app/uninstalled → POST /api/webhooks/shopify/uninstalled → marca isActive:false en ShopifyIntegration", done: false },
+      { label: "[CÓDIGO] Validar HMAC del webhook con X-Shopify-Hmac-Sha256 (mismo patrón que OAuth)", done: false },
+      { label: "[CÓDIGO] Registrar el webhook automáticamente al completar OAuth callback", done: false },
+      // ── Partners dashboard ───────────────────────────────────────────────────
+      { label: "[SHOPIFY] En Partners → App → Distribution → seleccionar 'Custom' (unlisted, no App Store)", done: false },
+      { label: "[SHOPIFY] En Partners → App → Configuration → declarar scope 'read_products' y webhook app/uninstalled", done: false },
+      { label: "[SHOPIFY] Subir app icon 1200×628px con logo Traffely", done: false },
+      { label: "[SHOPIFY] Completar App listing: descripción, screenshots del wizard con Shopify conectado", done: false },
+      // ── Legal / Web ──────────────────────────────────────────────────────────
+      { label: "[WEB] Crear página /privacy en traffely.com (Privacy Policy) — requerida por Shopify para el review", done: false },
+      { label: "[WEB] Crear página /terms en traffely.com (Terms of Service) — recomendada", done: false },
+      // ── Review ───────────────────────────────────────────────────────────────
+      { label: "[SHOPIFY] Enviar app a App Review desde Partners dashboard (tiempo estimado: 2–5 días hábiles)", done: false },
+      { label: "[SHOPIFY] Responder feedback del reviewer si lo hay y re-enviar", done: false },
+      { label: "[SHOPIFY] App aprobada → cualquier cliente puede conectar su tienda desde Traffely Settings", done: false },
     ],
   },
 ]
