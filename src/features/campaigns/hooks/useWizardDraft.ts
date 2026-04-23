@@ -2,12 +2,65 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useCampaignWizard } from "../store/campaign-wizard"
+import { EQUIPO_DEFAULT } from "../constants/campaign-data"
+import type { CampaignWizardState } from "../types"
 
 const LS_KEY = "traffely_wizard_draft"
 const LS_DRAFT_ID_KEY = "traffely_wizard_draft_id"
 const AUTOSAVE_DELAY = 2000 // ms
 
-export function useWizardDraft() {
+// Reconstructs wizard state from the DB campaign JSON fields
+function campaignToWizardState(campaign: Record<string, unknown>): Partial<CampaignWizardState> {
+  const brief = campaign.brief as Record<string, string> | null
+  const oferta = campaign.oferta as Record<string, string> | null
+  const modelos = campaign.modelos as Record<string, unknown> | null
+  const estructura = campaign.estructura as Record<string, unknown> | null
+  const presupuesto = campaign.presupuesto as Record<string, unknown> | null
+
+  return {
+    currentStep: Math.min((campaign.currentStep as number) ?? 1, 7),
+    nombreCampana: (campaign.name as string) ?? "",
+    tipoCampana: campaign.tipo === "EVERGREEN" ? "evergreen" : "estacional",
+    eventoEstacional: (campaign.eventoEstacional as string) ?? "",
+    // Brief (step 2)
+    contextoCampana: brief?.contextoCampana ?? "",
+    objetivoCampana: brief?.objetivoCampana ?? "",
+    publicoObjetivo: brief?.publicoObjetivo ?? "",
+    insightMensajeClave: brief?.insightMensajeClave ?? "",
+    propuestasValor: brief?.propuestasValor ?? "",
+    tonoYestilo: brief?.tonoYestilo ?? "",
+    llamadaAccion: brief?.llamadaAccion ?? "",
+    queNOhacer: brief?.queNOhacer ?? "",
+    // Oferta (step 3)
+    tipoOferta: (oferta?.tipoOferta ?? "") as CampaignWizardState["tipoOferta"],
+    otraOferta: oferta?.otraOferta ?? "",
+    contextoOferta: oferta?.contextoOferta ?? "",
+    ofertaMetodosPago: oferta?.metodosPago ?? "",
+    ofertaRegalo: oferta?.regalo ?? "",
+    ofertaGarantia: oferta?.garantia ?? "",
+    ofertaCambios: oferta?.cambios ?? "",
+    ofertaEnvio: oferta?.envio ?? "",
+    // Modelos (step 4)
+    modelosSeleccionados: (modelos?.seleccionados as string[]) ?? [],
+    modelosCustom: (modelos?.custom as string[]) ?? [],
+    preciosModelos: (modelos?.precios as CampaignWizardState["preciosModelos"]) ?? {},
+    modelosDescripcion: (modelos?.descripcion as CampaignWizardState["modelosDescripcion"]) ?? {},
+    // Estructura (step 5)
+    objetivo: (estructura?.objetivo as string) ?? "",
+    tipoPresupuesto: ((estructura?.tipoPresupuesto as string) ?? "ABO") as CampaignWizardState["tipoPresupuesto"],
+    campanas: (estructura?.campanas as CampaignWizardState["campanas"]) ?? [],
+    // Presupuesto (step 6)
+    presupuestoModo: ((presupuesto?.modo as string) ?? "mensual") as CampaignWizardState["presupuestoModo"],
+    presupuestoValor: (presupuesto?.valor as string) ?? "",
+    fechaInicio: (presupuesto?.fechaInicio as string) ?? "",
+    fechaFin: (presupuesto?.fechaFin as string) ?? "",
+    sinFechaFin: (presupuesto?.sinFechaFin as boolean) ?? false,
+    // Equipo (step 7)
+    equipo: (campaign.equipo as CampaignWizardState["equipo"]) ?? EQUIPO_DEFAULT,
+  }
+}
+
+export function useWizardDraft(resumeId?: string | null) {
   const store = useCampaignWizard()
   const { loadFromJson } = store
   const [draftRestored, setDraftRestored] = useState(false)
@@ -16,10 +69,29 @@ export function useWizardDraft() {
   const dbDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const initialized = useRef(false)
 
-  // On mount: restore from localStorage, then create/link DB draft
+  // On mount: if resumeId, load from DB. Otherwise restore from localStorage.
   useEffect(() => {
-    let restored = false
+    if (resumeId) {
+      // Resume an existing campaign — load from DB
+      fetch(`/api/campaigns/${resumeId}`)
+        .then(r => r.ok ? r.json() : null)
+        .then((data: Record<string, unknown> | null) => {
+          if (data) {
+            const wizardState = campaignToWizardState(data)
+            loadFromJson(wizardState)
+            setDraftId(resumeId)
+            localStorage.setItem(LS_DRAFT_ID_KEY, resumeId)
+            // Clear old localStorage draft to avoid conflicts
+            localStorage.removeItem(LS_KEY)
+            setDraftRestored(true)
+          }
+        })
+        .catch(() => {/* fallback to empty wizard */})
+        .finally(() => { initialized.current = true })
+      return
+    }
 
+    // Normal flow: restore from localStorage
     try {
       const raw = localStorage.getItem(LS_KEY)
       const existingDraftId = localStorage.getItem(LS_DRAFT_ID_KEY)
@@ -32,7 +104,6 @@ export function useWizardDraft() {
           if (saved.currentStep > 7) saved.currentStep = 1
           loadFromJson(saved)
           setDraftRestored(true)
-          restored = true
         }
       }
 

@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation"
 import Link from "next/link"
 import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db/prisma"
-import { ArrowLeftIcon, LayoutGridIcon } from "lucide-react"
+import { ArrowLeftIcon, LayoutGridIcon, PencilIcon } from "lucide-react"
 import CampaignPromptActions from "./CampaignPromptActions"
 import CampaignGenerateSection from "./CampaignGenerateSection"
 import CampaignStatusBar from "./CampaignStatusBar"
@@ -118,6 +118,15 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
               <span className={cn("w-1.5 h-1.5 rounded-full", st.dot)} />
               {st.label}
             </span>
+            {campaign.status === "DRAFT" && !campaign.promptMaestro && canManage && (
+              <Link
+                href={`/campaigns/new?resume=${campaign.id}`}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
+              >
+                <PencilIcon className="w-3 h-3" />
+                Continuar editando
+              </Link>
+            )}
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">
             {campaign.tipo === "EVERGREEN" ? "Evergreen" : "Estacional"}
