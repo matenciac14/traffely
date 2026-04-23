@@ -53,9 +53,7 @@ export async function POST(
 
   const uploadUrl = await getUploadUrl(key, contentType)
 
-  const bucket = process.env.AWS_S3_BUCKET!
-  const region = process.env.AWS_REGION!
-  const archivoUrl = `https://${bucket}.s3.${region}.amazonaws.com/${key}`
+  const archivoUrl = `https://traffely-creatives.s3.us-east-1.amazonaws.com/${key}`
 
   return NextResponse.json({ uploadUrl, key, archivoUrl })
 }
