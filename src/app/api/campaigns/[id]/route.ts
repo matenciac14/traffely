@@ -76,7 +76,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             ? wizardState.eventoCustom
             : wizardState.eventoEstacional || null,
           currentStep: wizardState.currentStep,
-          brief: wizardState.contextoCampana ? JSON.parse(JSON.stringify({
+          brief: JSON.parse(JSON.stringify({
+            empresa: wizardState.empresa,
             contextoCampana: wizardState.contextoCampana,
             objetivoCampana: wizardState.objetivoCampana,
             publicoObjetivo: wizardState.publicoObjetivo,
@@ -85,7 +86,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             tonoYestilo: wizardState.tonoYestilo,
             llamadaAccion: wizardState.llamadaAccion,
             queNOhacer: wizardState.queNOhacer,
-          })) : undefined,
+          })),
           oferta: wizardState.tipoOferta ? JSON.parse(JSON.stringify({
             tipoOferta: wizardState.tipoOferta,
             otraOferta: wizardState.otraOferta,

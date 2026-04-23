@@ -19,6 +19,7 @@ function campaignToWizardState(campaign: Record<string, unknown>): Partial<Campa
 
   return {
     currentStep: Math.min((campaign.currentStep as number) ?? 1, 7),
+    empresa: brief?.empresa ?? "",
     nombreCampana: (campaign.name as string) ?? "",
     tipoCampana: campaign.tipo === "EVERGREEN" ? "evergreen" : "estacional",
     eventoEstacional: (campaign.eventoEstacional as string) ?? "",
