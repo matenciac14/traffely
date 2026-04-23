@@ -81,6 +81,15 @@ export async function PATCH(
     data.dueDate = body.dueDate ? new Date(body.dueDate) : null
   }
 
+  if (body.archivoUrl !== undefined && body.archivoKey !== undefined) {
+    const expectedPrefix = `workspaces/${session.user.workspaceId}/`
+    if (body.archivoKey && !String(body.archivoKey).startsWith(expectedPrefix)) {
+      return NextResponse.json({ error: "Key inválida" }, { status: 400 })
+    }
+    data.archivoUrl = body.archivoUrl ?? null
+    data.archivoKey = body.archivoKey ?? null
+  }
+
   if (body.assigneeId !== undefined) {
     if (body.assigneeId === null) {
       data.assigneeId = null

@@ -8,16 +8,16 @@ export const authConfig: NextAuthConfig = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
-        token.role = (user as any).role
-        token.workspaceId = (user as any).workspaceId
+        token.role = user.role
+        token.workspaceId = user.workspaceId
       }
       return token
     },
     async session({ session, token }) {
       if (token) {
-        session.user.id = token.id as string
-        session.user.role = token.role as string
-        session.user.workspaceId = token.workspaceId as string
+        session.user.id = token.id ?? ""
+        session.user.role = token.role ?? "VIEWER"
+        session.user.workspaceId = token.workspaceId ?? null
       }
       return session
     },
