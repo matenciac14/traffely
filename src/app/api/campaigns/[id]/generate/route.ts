@@ -63,7 +63,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     }),
     db.workspace.findUnique({
       where: { id: session.user.workspaceId },
-      select: { aiProfile: true, aiApiKey: true },
+      select: { aiProfile: true, aiApiKey: true, globalAiEnabled: true },
     }),
   ])
 
@@ -88,14 +88,16 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   }
 
   const workspaceAiKey = workspace?.aiApiKey ?? null
-  const hasApiKey = !!(workspaceAiKey || process.env.ANTHROPIC_API_KEY)
+  const canUseGlobalKey = !!workspace?.globalAiEnabled && !!process.env.ANTHROPIC_API_KEY
+  const resolvedKey = workspaceAiKey || (canUseGlobalKey ? process.env.ANTHROPIC_API_KEY : undefined)
+  const hasApiKey = !!resolvedKey
 
   // Fallback mock si no hay API key
   if (!hasApiKey) {
     return new Response(mockStream(campaign.promptMaestro), { headers: ssHeaders })
   }
 
-  const aiClient = getAiClient(workspaceAiKey)
+  const aiClient = getAiClient(resolvedKey)
   const aiProfile = workspace?.aiProfile as Record<string, string> | null
   const systemPrompt = buildSystemPrompt(aiProfile)
   const workspaceId = session.user.workspaceId

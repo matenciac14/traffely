@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import {
   XIcon, UserIcon, ChevronRightIcon, ChevronLeftIcon,
   SendIcon, FileTextIcon, MessageSquareIcon, ClockIcon,
-  SparklesIcon, LinkIcon, Loader2Icon, UploadIcon, CheckCircleIcon,
+  SparklesIcon, LinkIcon, Loader2Icon, UploadIcon, CheckCircleIcon, Trash2Icon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -124,12 +124,13 @@ interface Props {
   currentUserId: string
   canAdvance: boolean
   canAssign: boolean
+  canDelete: boolean
   onClose: () => void
 }
 
 type Tab = "detalles" | "comentarios"
 
-export default function PieceDrawer({ pieceId, members, currentUserId, canAdvance, canAssign, onClose }: Props) {
+export default function PieceDrawer({ pieceId, members, currentUserId, canAdvance, canAssign, canDelete, onClose }: Props) {
   const router = useRouter()
   const [piece, setPiece] = useState<PieceDetail | null>(null)
   const [loading, setLoading] = useState(false)
@@ -142,6 +143,7 @@ export default function PieceDrawer({ pieceId, members, currentUserId, canAdvanc
   const [adUrlInput, setAdUrlInput] = useState("")
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [deleting, setDeleting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const commentsEndRef = useRef<HTMLDivElement>(null)
 
@@ -283,6 +285,17 @@ export default function PieceDrawer({ pieceId, members, currentUserId, canAdvanc
       setUploadProgress(0)
       if (fileInputRef.current) fileInputRef.current.value = ""
     }
+  }
+
+  async function deleteArchivoFile() {
+    if (!piece || !confirm("¿Eliminar el archivo creativo?")) return
+    setDeleting(true)
+    const res = await fetch(`/api/pieces/${piece.id}/file`, { method: "DELETE" })
+    if (res.ok) {
+      setPiece((p) => p ? { ...p, archivoUrl: null, archivoKey: null, archivoSignedUrl: null } : p)
+      router.refresh()
+    }
+    setDeleting(false)
   }
 
   async function saveAdUrl() {
@@ -551,13 +564,25 @@ export default function PieceDrawer({ pieceId, members, currentUserId, canAdvanc
                             <CheckCircleIcon className="w-4 h-4 text-emerald-500 flex-shrink-0" />
                             Ver archivo subido
                           </a>
-                          <button
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={uploading}
-                            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                          >
-                            Reemplazar
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={uploading || deleting}
+                              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              Reemplazar
+                            </button>
+                            {canDelete && (
+                              <button
+                                onClick={deleteArchivoFile}
+                                disabled={deleting || uploading}
+                                className="text-[11px] text-destructive hover:text-destructive/80 transition-colors flex items-center gap-1 disabled:opacity-50"
+                              >
+                                {deleting ? <Loader2Icon className="w-3 h-3 animate-spin" /> : <Trash2Icon className="w-3 h-3" />}
+                                Eliminar
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ) : (

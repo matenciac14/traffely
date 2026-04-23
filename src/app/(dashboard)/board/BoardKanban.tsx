@@ -217,6 +217,7 @@ export default function BoardKanban({ pieces, members, currentUserId, currentUse
 
   const canAdvance = ["OWNER", "SUPER_ADMIN", "CREATIVO", "TRAFFICKER"].includes(currentUserRole)
   const canAssign = ["OWNER", "SUPER_ADMIN"].includes(currentUserRole)
+  const canDelete = ["OWNER", "SUPER_ADMIN"].includes(currentUserRole)
 
   // Unique campaigns for filter
   const campaigns = useMemo(() => {
@@ -315,6 +316,7 @@ export default function BoardKanban({ pieces, members, currentUserId, currentUse
         currentUserId={currentUserId}
         canAdvance={canAdvance}
         canAssign={canAssign}
+        canDelete={canDelete}
         onClose={() => setOpenPieceId(null)}
       />
     </div>

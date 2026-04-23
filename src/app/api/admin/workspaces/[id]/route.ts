@@ -52,12 +52,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
 
     if (action === "billing") {
-      await db.workspace.update({ where: { id }, data: { billingStatus: value } })
+      const billingStatus = String(value)
+      await db.workspace.update({ where: { id }, data: { billingStatus } })
       await db.auditLog.create({
         data: {
           userId: adminId,
           action: "workspace.billing",
-          diff: { workspaceId: id, billingStatus: value },
+          diff: { workspaceId: id, billingStatus } as object,
         },
       })
     }
@@ -70,6 +71,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         data: {
           userId: adminId,
           action: `workspace.meta.${ws.metaEnabled ? "disable" : "enable"}`,
+          diff: { workspaceId: id } as object,
+        },
+      })
+    }
+
+    if (action === "globalAi") {
+      const ws = await db.workspace.findUnique({ where: { id, isDeleted: false } })
+      if (!ws) return NextResponse.json({ error: "Not found" }, { status: 404 })
+      await db.workspace.update({ where: { id }, data: { globalAiEnabled: !ws.globalAiEnabled } })
+      await db.auditLog.create({
+        data: {
+          userId: adminId,
+          action: `workspace.globalAi.${ws.globalAiEnabled ? "disable" : "enable"}`,
           diff: { workspaceId: id } as object,
         },
       })

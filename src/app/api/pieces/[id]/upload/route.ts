@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db/prisma"
-import { getUploadUrl, buildKey } from "@/lib/s3/client"
+import { getUploadUrl, buildKey, BUCKET } from "@/lib/s3/client"
 
 const ALLOWED_TYPES = [
   "image/jpeg", "image/png", "image/webp", "image/gif",
@@ -53,7 +53,7 @@ export async function POST(
 
   const uploadUrl = await getUploadUrl(key, contentType)
 
-  const archivoUrl = `https://traffely-creatives.s3.us-east-1.amazonaws.com/${key}`
+  const archivoUrl = `https://${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`
 
   return NextResponse.json({ uploadUrl, key, archivoUrl })
 }
