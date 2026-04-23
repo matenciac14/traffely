@@ -89,7 +89,9 @@ const ROADMAP: { fase: string; status: "done" | "in-progress" | "pending"; items
       { label: "Onboarding self-serve (registro OWNER)", done: false },
       { label: "Notificaciones por email (invitación, cambio estado)", done: false },
       { label: "Sentry o similar para error tracking en producción", done: false },
-      { label: "Deploy Vercel + Neon producción", done: false },
+      { label: "Deploy Vercel + Neon producción (traffely.com live)", done: true },
+      { label: "DNS Route 53 → Vercel (A record + CNAME actualizados)", done: true },
+      { label: "Google OAuth eliminado (no se usa, causaba crash en edge)", done: true },
     ],
   },
   {
