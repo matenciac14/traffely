@@ -154,6 +154,9 @@ model Campaign {
   versions  CampaignVersion[]
   comments  Comment[]
 
+  @@index([workspaceId])
+  @@index([createdById])
+  @@index([status])
   @@map("campaigns")
 }
 
@@ -172,6 +175,7 @@ model AdSet {
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   pieces   Piece[]
 
+  @@index([campaignId])
   @@map("ad_sets")
 }
 
@@ -223,6 +227,9 @@ model Piece {
   assignee User?    @relation("PieceAssignee", fields: [assigneeId], references: [id])
   comments Comment[]
 
+  @@index([adSetId])
+  @@index([assigneeId])
+  @@index([taskStatus])
   @@map("pieces")
 }
 
@@ -251,6 +258,8 @@ model Comment {
   piece    Piece?    @relation(fields: [pieceId], references: [id], onDelete: Cascade)
   user     User      @relation(fields: [userId], references: [id])
 
+  @@index([pieceId])
+  @@index([campaignId])
   @@map("comments")
 }
 
@@ -265,6 +274,8 @@ model AuditLog {
   campaign Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   user     User      @relation(fields: [userId], references: [id])
 
+  @@index([campaignId])
+  @@index([userId])
   @@map("audit_logs")
 }
 
@@ -282,5 +293,7 @@ model AiUsage {
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
+  @@index([workspaceId])
+  @@index([campaignId])
   @@map("ai_usage")
 }
