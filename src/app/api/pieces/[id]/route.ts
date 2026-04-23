@@ -110,5 +110,27 @@ export async function PATCH(
     select: { id: true, taskStatus: true, assigneeId: true, assignee: { select: { id: true, name: true } } },
   })
 
+  // Notificar al assignee si cambia el estado
+  if (data.taskStatus && piece.assigneeId && piece.assigneeId !== session.user.id) {
+    const statusLabels: Record<string, string> = {
+      EN_PRODUCCION: "En producción",
+      EN_REVISION: "En revisión",
+      APROBADO: "Aprobado",
+      PUBLICADO: "Publicado",
+      RECHAZADO: "Rechazado",
+      PENDIENTE: "Pendiente",
+    }
+    await db.notification.create({
+      data: {
+        userId: piece.assigneeId,
+        workspaceId: session.user.workspaceId!,
+        type: "piece_status_changed",
+        title: "Estado de pieza actualizado",
+        body: `Tu pieza pasó a "${statusLabels[data.taskStatus as string] ?? data.taskStatus}"`,
+        pieceId: piece.id,
+      },
+    })
+  }
+
   return NextResponse.json(updated)
 }

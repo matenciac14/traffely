@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db/prisma"
+import { z } from "zod"
+
+const metaSchema = z.object({
+  metaEnabled: z.boolean().optional(),
+  metaAdAccountId: z.string().max(50).optional(),
+})
 
 export async function PATCH(req: Request) {
   const session = await auth()
@@ -9,7 +15,12 @@ export async function PATCH(req: Request) {
   }
 
   try {
-    const { metaAdAccountId } = await req.json()
+    const body = await req.json()
+    const result = metaSchema.safeParse(body)
+    if (!result.success) {
+      return NextResponse.json({ error: "Datos inválidos", details: result.error.flatten() }, { status: 400 })
+    }
+    const { metaAdAccountId } = result.data
     await db.workspace.update({
       where: { id: session.user.workspaceId },
       data: { metaAdAccountId: metaAdAccountId ?? null },
