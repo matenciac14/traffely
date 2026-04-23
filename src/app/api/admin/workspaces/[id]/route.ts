@@ -52,12 +52,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
 
     if (action === "billing") {
-      await db.workspace.update({ where: { id }, data: { billingStatus: value } })
+      const billingStatus = String(value)
+      await db.workspace.update({ where: { id }, data: { billingStatus } })
       await db.auditLog.create({
         data: {
           userId: adminId,
           action: "workspace.billing",
-          diff: { workspaceId: id, billingStatus: value },
+          diff: { workspaceId: id, billingStatus } as object,
         },
       })
     }
