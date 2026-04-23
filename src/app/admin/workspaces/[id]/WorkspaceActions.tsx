@@ -2,21 +2,22 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { MoreHorizontalIcon, PowerIcon, CheckCircleIcon, TrashIcon, ToggleRightIcon } from "lucide-react"
+import { MoreHorizontalIcon, PowerIcon, CheckCircleIcon, TrashIcon, ToggleRightIcon, SparklesIcon } from "lucide-react"
 
 interface Props {
   workspaceId: string
   isActive: boolean
   billingStatus: string
   metaEnabled: boolean
+  globalAiEnabled: boolean
 }
 
-export default function WorkspaceActions({ workspaceId, isActive, billingStatus, metaEnabled }: Props) {
+export default function WorkspaceActions({ workspaceId, isActive, billingStatus, metaEnabled, globalAiEnabled }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  async function action(type: "toggle" | "billing" | "delete" | "meta", value?: string) {
+  async function action(type: "toggle" | "billing" | "delete" | "meta" | "globalAi", value?: string) {
     setLoading(true)
     setOpen(false)
 
@@ -74,6 +75,13 @@ export default function WorkspaceActions({ workspaceId, isActive, billingStatus,
             >
               <ToggleRightIcon className="w-4 h-4" />
               Meta Ads: {metaEnabled ? "desactivar" : "activar"}
+            </button>
+            <button
+              onClick={() => action("globalAi")}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
+            >
+              <SparklesIcon className="w-4 h-4" />
+              IA global: {globalAiEnabled ? "desactivar" : "activar"}
             </button>
             <div className="border-t border-border my-1" />
             <button

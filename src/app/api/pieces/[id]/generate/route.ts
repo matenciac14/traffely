@@ -41,7 +41,7 @@ export async function POST(
           campaign: {
             select: {
               id: true, name: true,
-              workspace: { select: { aiProfile: true, aiApiKey: true, aiProvider: true } },
+              workspace: { select: { aiProfile: true, aiApiKey: true, aiProvider: true, globalAiEnabled: true } },
             },
           },
         },
@@ -55,8 +55,10 @@ export async function POST(
 
   const aiProfile = piece.adSet.campaign.workspace.aiProfile as Record<string, string> | null
   const workspaceAiKey = piece.adSet.campaign.workspace.aiApiKey ?? null
-  const hasApiKey = !!(workspaceAiKey || process.env.ANTHROPIC_API_KEY)
-  const aiClient = getAiClient(workspaceAiKey)
+  const canUseGlobalKey = !!piece.adSet.campaign.workspace.globalAiEnabled && !!process.env.ANTHROPIC_API_KEY
+  const resolvedKey = workspaceAiKey || (canUseGlobalKey ? process.env.ANTHROPIC_API_KEY : undefined)
+  const hasApiKey = !!resolvedKey
+  const aiClient = getAiClient(resolvedKey)
 
   // Build prompt
   const pieceContext = [

@@ -45,12 +45,17 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
                 Meta Ads ✓
               </span>
             )}
+            {workspace.globalAiEnabled && (
+              <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-violet-50 text-violet-700">
+                IA global ✓
+              </span>
+            )}
           </div>
           {(workspace.city || workspace.country) && (
             <p className="text-sm text-muted-foreground mt-0.5">{[workspace.city, workspace.country].filter(Boolean).join(", ")}</p>
           )}
         </div>
-        <WorkspaceActions workspaceId={workspace.id} isActive={workspace.isActive} billingStatus={workspace.billingStatus} metaEnabled={workspace.metaEnabled} />
+        <WorkspaceActions workspaceId={workspace.id} isActive={workspace.isActive} billingStatus={workspace.billingStatus} metaEnabled={workspace.metaEnabled} globalAiEnabled={workspace.globalAiEnabled} />
       </div>
 
       {/* Stats */}

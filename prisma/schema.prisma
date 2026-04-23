@@ -85,6 +85,9 @@ model Workspace {
   metaEnabled     Boolean @default(false)
   metaAdAccountId String?
 
+  // IA global — SUPER_ADMIN habilita uso de la API key global de Traffely
+  globalAiEnabled Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
