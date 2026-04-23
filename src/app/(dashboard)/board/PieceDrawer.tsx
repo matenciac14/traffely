@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import {
   XIcon, UserIcon, ChevronRightIcon, ChevronLeftIcon,
   SendIcon, FileTextIcon, MessageSquareIcon, ClockIcon,
-  SparklesIcon, LinkIcon, Loader2Icon,
+  SparklesIcon, LinkIcon, Loader2Icon, UploadIcon, CheckCircleIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -129,6 +129,9 @@ export default function PieceDrawer({ pieceId, members, currentUserId, canAdvanc
   const [generating, setGenerating] = useState(false)
   const [streamedText, setStreamedText] = useState("")
   const [adUrlInput, setAdUrlInput] = useState("")
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const commentsEndRef = useRef<HTMLDivElement>(null)
 
   // Fetch piece details when opened
@@ -222,6 +225,52 @@ export default function PieceDrawer({ pieceId, members, currentUserId, canAdvanc
       setStreamedText("")
     } finally {
       setGenerating(false)
+    }
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !piece) return
+
+    setUploading(true)
+    setUploadProgress(0)
+
+    try {
+      // 1. Get presigned URL
+      const res = await fetch(`/api/pieces/${piece.id}/upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: file.name, contentType: file.type, sizeBytes: file.size }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        alert(err.error ?? "Error al preparar upload")
+        return
+      }
+      const { uploadUrl, key, archivoUrl } = await res.json()
+
+      // 2. Upload directly to S3
+      const xhr = new XMLHttpRequest()
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100))
+      }
+      await new Promise<void>((resolve, reject) => {
+        xhr.open("PUT", uploadUrl)
+        xhr.setRequestHeader("Content-Type", file.type)
+        xhr.onload = () => xhr.status === 200 ? resolve() : reject(new Error(`S3 error ${xhr.status}`))
+        xhr.onerror = () => reject(new Error("Network error"))
+        xhr.send(file)
+      })
+
+      // 3. Save URL to piece
+      await patchPiece({ archivoUrl, archivoKey: key })
+      setPiece((p) => p ? { ...p, archivoUrl } : p)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Error al subir archivo")
+    } finally {
+      setUploading(false)
+      setUploadProgress(0)
+      if (fileInputRef.current) fileInputRef.current.value = ""
     }
   }
 
@@ -460,21 +509,67 @@ export default function PieceDrawer({ pieceId, members, currentUserId, canAdvanc
                     </div>
                   )}
 
-                  {/* File */}
-                  {piece.archivoUrl && (
-                    <div>
-                      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Archivo creativo</h3>
-                      <a
-                        href={piece.archivoUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-xs text-primary hover:underline"
+                  {/* File upload */}
+                  <div>
+                    <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Archivo creativo</h3>
+
+                    {piece.archivoUrl ? (
+                      <div className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-muted/30">
+                        <a
+                          href={piece.archivoUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-xs text-primary hover:underline"
+                        >
+                          <CheckCircleIcon className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                          Ver archivo subido
+                        </a>
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploading}
+                          className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          Reemplazar
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        className="w-full flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 border-dashed border-border hover:border-primary/50 hover:bg-primary/5 transition-colors disabled:opacity-50"
                       >
-                        <FileTextIcon className="w-4 h-4" />
-                        Ver archivo
-                      </a>
-                    </div>
-                  )}
+                        {uploading ? (
+                          <>
+                            <Loader2Icon className="w-5 h-5 text-primary animate-spin" />
+                            <span className="text-xs text-muted-foreground">{uploadProgress}% subido…</span>
+                          </>
+                        ) : (
+                          <>
+                            <UploadIcon className="w-5 h-5 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">Subir archivo creativo</span>
+                            <span className="text-[10px] text-muted-foreground/60">JPG, PNG, MP4, MOV, PDF · máx 200MB</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*,video/*,application/pdf"
+                      className="hidden"
+                      onChange={handleFileUpload}
+                    />
+
+                    {uploading && uploadProgress > 0 && (
+                      <div className="mt-2 h-1 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary transition-all duration-200"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
 
                   {/* Timestamps */}
                   <div className="pt-2 border-t border-border">
