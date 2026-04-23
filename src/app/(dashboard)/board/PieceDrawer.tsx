@@ -83,6 +83,15 @@ const PREV_STATUS: Record<string, string> = {
   PUBLICADO: "APROBADO",
 }
 
+// ─── File type helper ────────────────────────────────────────────────────────
+
+function getFileType(url: string): "image" | "video" | "other" {
+  const ext = url.split("?")[0].split(".").pop()?.toLowerCase() ?? ""
+  if (["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) return "image"
+  if (["mp4", "mov", "webm"].includes(ext)) return "video"
+  return "other"
+}
+
 // ─── Meta field helper ───────────────────────────────────────────────────────
 
 function MetaRow({ label, value }: { label: string; value: string | null | undefined }) {
@@ -514,23 +523,40 @@ export default function PieceDrawer({ pieceId, members, currentUserId, canAdvanc
                     <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Archivo creativo</h3>
 
                     {piece.archivoUrl ? (
-                      <div className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-muted/30">
-                        <a
-                          href={piece.archivoUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 text-xs text-primary hover:underline"
-                        >
-                          <CheckCircleIcon className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                          Ver archivo subido
-                        </a>
-                        <button
-                          onClick={() => fileInputRef.current?.click()}
-                          disabled={uploading}
-                          className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          Reemplazar
-                        </button>
+                      <div className="space-y-2">
+                        {/* Inline preview */}
+                        {getFileType(piece.archivoUrl) === "image" && (
+                          <img
+                            src={piece.archivoUrl}
+                            alt="Preview"
+                            className="max-h-48 w-full object-contain rounded-lg border border-border"
+                          />
+                        )}
+                        {getFileType(piece.archivoUrl) === "video" && (
+                          <video
+                            src={piece.archivoUrl}
+                            controls
+                            className="w-full rounded-lg max-h-48"
+                          />
+                        )}
+                        <div className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-muted/30">
+                          <a
+                            href={piece.archivoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 text-xs text-primary hover:underline"
+                          >
+                            <CheckCircleIcon className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                            Ver archivo subido
+                          </a>
+                          <button
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={uploading}
+                            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            Reemplazar
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <button
