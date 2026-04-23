@@ -146,6 +146,10 @@ model Campaign {
   promptMaestro String?
   promptVersion String  @default("v1.0")
 
+  // Contenido generado por IA (brief creativo completo)
+  briefGenerado   String?
+  briefGeneradoAt DateTime?
+
   isArchived Boolean @default(false)
 
   createdAt DateTime @default(now())

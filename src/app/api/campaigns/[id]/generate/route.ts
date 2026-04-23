@@ -114,6 +114,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       const encoder = new TextEncoder()
       let inputTokens = 0
       let outputTokens = 0
+      let fullText = ""
 
       try {
         for await (const event of stream) {
@@ -121,6 +122,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
             inputTokens = event.message.usage.input_tokens
           }
           if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            fullText += event.delta.text
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`)
             )
@@ -129,6 +131,12 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
             outputTokens = event.usage.output_tokens
           }
         }
+
+        // Save generated brief to DB
+        await db.campaign.update({
+          where: { id },
+          data: { briefGenerado: fullText, briefGeneradoAt: new Date() },
+        })
 
         // Track cost ($5/1M input, $25/1M output — Opus 4.6)
         const costUsd = (inputTokens * 5 + outputTokens * 25) / 1_000_000
