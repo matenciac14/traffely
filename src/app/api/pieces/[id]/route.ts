@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db/prisma"
+import { getDownloadUrl } from "@/lib/s3/client"
 
 export async function GET(
   _req: Request,
@@ -32,7 +33,16 @@ export async function GET(
   })
 
   if (!piece) return NextResponse.json({ error: "No encontrado" }, { status: 404 })
-  return NextResponse.json(piece)
+
+  // Generate presigned URL for private S3 files
+  let archivoSignedUrl: string | null = null
+  if (piece.archivoKey) {
+    try {
+      archivoSignedUrl = await getDownloadUrl(piece.archivoKey)
+    } catch { /* ignore */ }
+  }
+
+  return NextResponse.json({ ...piece, archivoSignedUrl })
 }
 
 const TASK_STATUSES = ["PENDIENTE", "EN_PRODUCCION", "EN_REVISION", "APROBADO", "PUBLICADO", "RECHAZADO"] as const

@@ -54,14 +54,14 @@ const ROADMAP: { fase: string; status: "done" | "in-progress" | "pending"; items
   },
   {
     fase: "Fase 5 — Archivos + Copys por pieza",
-    status: "in-progress" as const,
+    status: "done" as const,
     items: [
       { label: "Generación de guión/copy por pieza individual con Claude (SSE)", done: true },
       { label: "Link del ad en Meta al marcar como PUBLICADO", done: true },
       { label: "Prioridad y fecha límite por pieza (schema + API)", done: true },
       { label: "Subida de archivos creativos a S3 desde el drawer", done: true },
-      { label: "Preview de archivos en drawer de pieza", done: false },
-      { label: "Notificaciones in-app al cambiar estado de pieza asignada", done: false },
+      { label: "Preview de archivos en drawer de pieza", done: true },
+      { label: "Notificaciones in-app al cambiar estado de pieza asignada", done: true },
     ],
   },
   {
@@ -81,7 +81,7 @@ const ROADMAP: { fase: string; status: "done" | "in-progress" | "pending"; items
       { label: "CSRF tokens en formularios POST", done: false },
       { label: "Índices de DB (@@index en workspaceId, campaignId, assigneeId)", done: true },
       { label: "Fix as any en auth config (role/workspaceId tipados)", done: true },
-      { label: "Zod en todas las API routes (ai-profile, admin/workspaces, meta)", done: false },
+      { label: "Zod en todas las API routes (ai-profile, admin/workspaces, meta)", done: true },
       { label: "Rate limiting Redis (Upstash) para producción", done: false },
       { label: "Rate limiting en registro (anti-spam)", done: false },
       { label: "Verificación de email al crear usuario", done: false },

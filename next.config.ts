@@ -14,7 +14,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https:",
       "font-src 'self'",
-      "connect-src 'self' https://api.anthropic.com https://api.openai.com",
+      "connect-src 'self' https://api.anthropic.com https://api.openai.com https://traffely-creatives.s3.us-east-1.amazonaws.com",
     ].join("; "),
   },
 ]
