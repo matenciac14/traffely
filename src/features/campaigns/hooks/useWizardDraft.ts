@@ -27,6 +27,9 @@ export function useWizardDraft() {
       if (raw) {
         const saved = JSON.parse(raw)
         if (saved.empresa || saved.nombreCampana) {
+          // Clamp currentStep to valid wizard range (1–7)
+          // A saved step > 7 means the wizard was already completed
+          if (saved.currentStep > 7) saved.currentStep = 1
           loadFromJson(saved)
           setDraftRestored(true)
           restored = true
