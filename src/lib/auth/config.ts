@@ -1,6 +1,5 @@
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
-import Google from "next-auth/providers/google"
 import { db } from "@/lib/db/prisma"
 import bcrypt from "bcryptjs"
 import { z } from "zod"
@@ -14,9 +13,6 @@ const loginSchema = z.object({
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
   providers: [
-    ...(process.env.GOOGLE_CLIENT_ID
-      ? [Google({ clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET! })]
-      : []),
     Credentials({
       async authorize(credentials) {
         const parsed = loginSchema.safeParse(credentials)
