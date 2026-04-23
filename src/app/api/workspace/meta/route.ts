@@ -4,7 +4,7 @@ import { db } from "@/lib/db/prisma"
 import { z } from "zod"
 
 const metaSchema = z.object({
-  metaEnabled: z.boolean(),
+  metaEnabled: z.boolean().optional(),
   metaAdAccountId: z.string().max(50).optional(),
 })
 
