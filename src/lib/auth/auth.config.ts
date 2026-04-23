@@ -5,10 +5,9 @@ import Google from "next-auth/providers/google"
 // Edge-compatible config — sin imports de Node.js (Prisma, bcrypt)
 export const authConfig: NextAuthConfig = {
   providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
+    ...(process.env.GOOGLE_CLIENT_ID
+      ? [Google({ clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET! })]
+      : []),
     Credentials({ credentials: {} }),
   ],
   callbacks: {
