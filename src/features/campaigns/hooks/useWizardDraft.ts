@@ -5,8 +5,8 @@ import { useCampaignWizard } from "../store/campaign-wizard"
 import { EQUIPO_DEFAULT } from "../constants/campaign-data"
 import type { CampaignWizardState } from "../types"
 
-const LS_KEY = "traffely_wizard_draft"
-const LS_DRAFT_ID_KEY = "traffely_wizard_draft_id"
+const LS_KEY = (workspaceId: string) => `traffely_wizard_draft_${workspaceId}`
+const LS_DRAFT_ID_KEY = (workspaceId: string) => `traffely_wizard_draft_id_${workspaceId}`
 const AUTOSAVE_DELAY = 2000 // ms
 
 // Reconstructs wizard state from the DB campaign JSON fields
@@ -61,7 +61,7 @@ function campaignToWizardState(campaign: Record<string, unknown>): Partial<Campa
   }
 }
 
-export function useWizardDraft(resumeId?: string | null) {
+export function useWizardDraft(resumeId?: string | null, workspaceId?: string | null) {
   const store = useCampaignWizard()
   const { loadFromJson } = store
   const [draftRestored, setDraftRestored] = useState(false)
@@ -69,6 +69,10 @@ export function useWizardDraft(resumeId?: string | null) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const dbDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const initialized = useRef(false)
+
+  // Keys scoped por workspace — evita que un usuario vea el borrador de otro
+  const lsKey = LS_KEY(workspaceId ?? "anon")
+  const lsDraftIdKey = LS_DRAFT_ID_KEY(workspaceId ?? "anon")
 
   // On mount: if resumeId, load from DB. Otherwise restore from localStorage.
   useEffect(() => {
@@ -81,9 +85,9 @@ export function useWizardDraft(resumeId?: string | null) {
             const wizardState = campaignToWizardState(data)
             loadFromJson(wizardState)
             setDraftId(resumeId)
-            localStorage.setItem(LS_DRAFT_ID_KEY, resumeId)
+            localStorage.setItem(lsDraftIdKey, resumeId)
             // Clear old localStorage draft to avoid conflicts
-            localStorage.removeItem(LS_KEY)
+            localStorage.removeItem(lsKey)
             setDraftRestored(true)
           }
         })
@@ -92,10 +96,15 @@ export function useWizardDraft(resumeId?: string | null) {
       return
     }
 
-    // Normal flow: restore from localStorage
+    // Normal flow: restore from localStorage (solo si tenemos workspaceId)
+    if (!workspaceId) {
+      initialized.current = true
+      return
+    }
+
     try {
-      const raw = localStorage.getItem(LS_KEY)
-      const existingDraftId = localStorage.getItem(LS_DRAFT_ID_KEY)
+      const raw = localStorage.getItem(lsKey)
+      const existingDraftId = localStorage.getItem(lsDraftIdKey)
 
       if (raw) {
         const saved = JSON.parse(raw)
@@ -121,14 +130,14 @@ export function useWizardDraft(resumeId?: string | null) {
           .then(data => {
             if (data?.id) {
               setDraftId(data.id)
-              localStorage.setItem(LS_DRAFT_ID_KEY, data.id)
+              localStorage.setItem(lsDraftIdKey, data.id)
             }
           })
           .catch(() => {/* offline or auth issue */})
       }
     } catch {
-      localStorage.removeItem(LS_KEY)
-      localStorage.removeItem(LS_DRAFT_ID_KEY)
+      localStorage.removeItem(lsKey)
+      localStorage.removeItem(lsDraftIdKey)
     }
 
     initialized.current = true
@@ -138,7 +147,7 @@ export function useWizardDraft(resumeId?: string | null) {
   // Autosave to localStorage on every state change (debounced 2s)
   // Then also sync to DB every 5s
   useEffect(() => {
-    if (!initialized.current) return
+    if (!initialized.current || !workspaceId) return
 
     // localStorage save
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -147,14 +156,14 @@ export function useWizardDraft(resumeId?: string | null) {
         const snapshot = Object.fromEntries(
           Object.entries(store).filter(([, v]) => typeof v !== "function")
         )
-        localStorage.setItem(LS_KEY, JSON.stringify(snapshot))
+        localStorage.setItem(lsKey, JSON.stringify(snapshot))
       } catch { /* storage full */ }
     }, AUTOSAVE_DELAY)
 
     // DB sync (slower)
     if (dbDebounceRef.current) clearTimeout(dbDebounceRef.current)
     dbDebounceRef.current = setTimeout(() => {
-      const id = draftId || localStorage.getItem(LS_DRAFT_ID_KEY)
+      const id = draftId || localStorage.getItem(lsDraftIdKey)
       if (!id) return
       fetch(`/api/campaigns/${id}`, {
         method: "PATCH",
@@ -170,8 +179,8 @@ export function useWizardDraft(resumeId?: string | null) {
   })
 
   function clearDraft() {
-    localStorage.removeItem(LS_KEY)
-    localStorage.removeItem(LS_DRAFT_ID_KEY)
+    localStorage.removeItem(lsKey)
+    localStorage.removeItem(lsDraftIdKey)
     setDraftRestored(false)
     setDraftId(null)
   }

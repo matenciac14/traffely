@@ -2,6 +2,7 @@
 
 import { useState, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { CheckIcon, RotateCcwIcon, XIcon } from "lucide-react"
 import { useCampaignWizard } from "@/features/campaigns/store/campaign-wizard"
 import { useWizardDraft } from "@/features/campaigns/hooks/useWizardDraft"
@@ -28,13 +29,15 @@ const STEPS = [
 function WizardContent() {
   const searchParams = useSearchParams()
   const resumeId = searchParams.get("resume")
+  const { data: session } = useSession()
+  const workspaceId = session?.user?.workspaceId ?? null
 
   const {
     currentStep, goNext, goBack,
     _avisoReservaMostrado, setField, reset,
   } = useCampaignWizard()
 
-  const { draftRestored, draftId, clearDraft, dismissRestoredBanner } = useWizardDraft(resumeId)
+  const { draftRestored, draftId, clearDraft, dismissRestoredBanner } = useWizardDraft(resumeId, workspaceId)
 
   const [error, setError] = useState<string | null>(null)
   const [isWarning, setIsWarning] = useState(false)
