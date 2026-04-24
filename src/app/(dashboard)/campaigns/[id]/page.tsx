@@ -6,6 +6,7 @@ import { ArrowLeftIcon, LayoutGridIcon, PencilIcon } from "lucide-react"
 import CampaignPromptActions from "./CampaignPromptActions"
 import CampaignGenerateSection from "./CampaignGenerateSection"
 import CampaignStatusBar from "./CampaignStatusBar"
+import CampaignActions from "./CampaignActions"
 import { cn } from "@/lib/utils"
 
 const STATUS_STYLE: Record<string, { label: string; class: string; dot: string }> = {
@@ -113,7 +114,8 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         </Link>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-xl font-semibold text-foreground">{campaign.name}</h1>
+            <h1 className="text-xl font-semibold text-foreground flex-1">{campaign.name}</h1>
+            <CampaignActions campaignId={campaign.id} isArchived={campaign.isArchived} canManage={canManage} />
             <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-semibold", st.class)}>
               <span className={cn("w-1.5 h-1.5 rounded-full", st.dot)} />
               {st.label}

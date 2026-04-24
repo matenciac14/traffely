@@ -310,3 +310,29 @@ export async function POST(
 
   return NextResponse.json({ error: "Acción inválida" }, { status: 400 })
 }
+
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth()
+  if (!session?.user?.workspaceId || !["OWNER", "SUPER_ADMIN"].includes(session.user.role ?? "")) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 })
+  }
+
+  const { id } = await params
+
+  const campaign = await db.campaign.findUnique({
+    where: { id, workspaceId: session.user.workspaceId },
+    select: { id: true },
+  })
+  if (!campaign) return NextResponse.json({ error: "Not found" }, { status: 404 })
+
+  try {
+    await db.campaign.delete({ where: { id } })
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    logger.error("DELETE /api/campaigns/[id]", err)
+    return NextResponse.json({ error: "Error interno" }, { status: 500 })
+  }
+}
