@@ -53,6 +53,7 @@ export function newCampana(nombre = ""): CampanaWizard {
 const INITIAL_STATE: CampaignWizardState = {
   currentStep: 1,
   empresa: "",
+  empresaId: "",
   tipoCampana: "",
   eventoEstacional: "",
   eventoCustom: "",

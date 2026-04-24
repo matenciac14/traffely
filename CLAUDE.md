@@ -84,9 +84,54 @@ Workspace → AiUsage
 - **S3**: bucket privado — usar siempre presigned URLs para upload (PUT, 15min) y preview (GET, 1hr)
 - **API keys workspace**: cifrar con AES-256-GCM antes de guardar en DB (`lib/utils/crypto.ts`)
 
-## Integración Shopify (Fase 10)
+## Arquitectura Multi-Empresa (Fase 12)
+
+### Modelo de datos
+```
+Workspace (agencia/cuenta)
+  ├── User[]                   ← equipo interno
+  ├── Empresa[]                ← clientes/marcas ← NUEVO
+  │   ├── EmpresaIdentidad     ← tono, público, propuestas de valor, palabras prohibidas
+  │   ├── ShopifyIntegration   ← por empresa (no por workspace)
+  │   └── Campaign[]           ← campañas de esta empresa
+  └── plan: STARTER|PRO|AGENCY
+```
+
+### Empresa — campos
+- `nombre`, `logo`, `industria`, `website`, `descripcion`, `isActive`
+- Relación 1:1 con `EmpresaIdentidad`
+- Relación 1:N con `Campaign`
+- Relación 1:1 con `ShopifyIntegration` (migrado desde Workspace)
+
+### EmpresaIdentidad — campos (equivale al aiProfile actual por workspace)
+- `tono`, `publicoObjetivo`, `propuestasValor`, `palabrasProhibidas`, `instruccionesExtra`
+- `colores`, `tipografias` (para referencia del creativo)
+
+### Rutas de API
+- `GET/POST /api/empresas`
+- `GET/PATCH/DELETE /api/empresas/[id]`
+- `PATCH /api/empresas/[id]/identidad`
+- `GET/DELETE /api/integrations/shopify` → opera con `empresaId`
+- `GET /api/integrations/shopify/products` → opera con `empresaId`
+
+### Flujo IA con empresa
+1. Usuario selecciona empresa en Step 1 del wizard
+2. Identidad de empresa se carga automáticamente (tono, público habitual, propuestas de valor)
+3. Brief campaña solo pide: objetivo, contexto específico, fechas
+4. Prompt maestro = identidad empresa + brief campaña
+5. Generación por pieza = identidad empresa como system prompt base
+
+### Planes y límites (sin enforcement por ahora)
+| Plan | Empresas | Campañas activas | Gen IA/mes |
+|------|----------|-----------------|------------|
+| STARTER | 1 | 3 | 20 |
+| PRO | 5 | ilimitadas | 100 |
+| AGENCY | ilimitadas | ilimitadas | ilimitadas |
+
+## Integración Shopify (Fase 10 — migrará a por-empresa en Fase 12)
 - **Objetivo**: catálogo read-only para importar productos/variantes en el wizard
-- **Modelo DB**: `ShopifyIntegration` (workspaceId unique, shop, accessToken cifrado AES-256-GCM, scope, isActive)
+- **Modelo DB actual**: `ShopifyIntegration` (workspaceId unique, shop, accessToken cifrado AES-256-GCM, scope, isActive)
+- **⚠️ Fase 12**: migrar `workspaceId` → `empresaId` (cada empresa tiene su propia tienda Shopify)
 - **OAuth**: `POST /api/integrations/shopify/connect` → URL → Shopify → `GET /api/integrations/shopify/callback`
 - **Estado/desconectar**: `GET|DELETE /api/integrations/shopify`
 - **Productos on-demand**: `GET /api/integrations/shopify/products` → llama API Shopify en tiempo real
@@ -96,7 +141,7 @@ Workspace → AiUsage
 - **Uso en wizard**:
   - Step 3 Oferta: `ShopifyProductPicker` → pre-fill `contextoOferta` con nombre + precio
   - Step 4 Modelos: `ShopifyProductPicker` → importa variantes como modelos con precios
-- **UI Settings**: tab "Shopify" en `/settings?tab=shopify` — solo OWNER/SUPER_ADMIN
+- **UI Settings**: tab "Shopify" en `/settings?tab=shopify` → en Fase 12 se mueve a `/empresas/[id]`
 - **Sin sync en background**: los productos se leen en tiempo real, no se guardan en DB
 
 ## IA — Generación de brief

@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { useCampaignWizard } from "../../../store/campaign-wizard"
 import { EVENTOS_ESTACIONALES } from "../../../constants/campaign-data"
 import { cn } from "@/lib/utils"
@@ -16,6 +17,35 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   )
 }
 
+function Chips({ options, value, onSelect }: { options: string[]; value: string; onSelect: (v: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-1.5">
+      {options.map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => onSelect(opt)}
+          className={cn(
+            "px-2.5 py-1 rounded-full text-xs border transition-all",
+            value === opt
+              ? "border-primary bg-primary/10 text-primary font-medium"
+              : "border-border bg-muted/50 text-muted-foreground hover:border-primary/50 hover:text-foreground"
+          )}
+        >
+          {opt}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+const OBJETIVOS = ["Aumentar ventas", "Generar leads", "Brand awareness", "Retención de clientes", "Lanzamiento de producto", "Tráfico al sitio web"]
+const TONOS = ["Cercano y amigable", "Aspiracional", "Profesional", "Divertido", "Urgente / FOMO", "Inspiracional", "Directo al grano"]
+const CTAS = ["Compra ahora", "Ver colección", "Obtén el tuyo", "Conoce más", "Regístrate gratis", "Aprovecha la oferta", "Agenda tu cita"]
+
+const EDADES = ["13-17", "18-24", "25-34", "35-44", "45-54", "55+"]
+const GENEROS = ["Hombres", "Mujeres", "Todos"]
+
 export default function Step2Brief() {
   const {
     tipoCampana, setTipoCampana,
@@ -26,6 +56,38 @@ export default function Step2Brief() {
     llamadaAccion, queNOhacer,
     seleccionarEvento, setField,
   } = useCampaignWizard()
+
+  // Público objetivo — estado local desglosado
+  const [edadesSelected, setEdadesSelected] = useState<string[]>([])
+  const [generoSelected, setGeneroSelected] = useState("")
+  const [publicoCustom, setPublicoCustom] = useState("")
+
+  function buildPublico(edades: string[], genero: string, custom: string) {
+    const parts: string[] = []
+    if (genero) parts.push(genero)
+    if (edades.length) parts.push(edades.join(", ") + " años")
+    if (custom.trim()) parts.push(custom.trim())
+    setField("publicoObjetivo", parts.join(" · "))
+  }
+
+  function toggleEdad(edad: string) {
+    const next = edadesSelected.includes(edad)
+      ? edadesSelected.filter((e) => e !== edad)
+      : [...edadesSelected, edad]
+    setEdadesSelected(next)
+    buildPublico(next, generoSelected, publicoCustom)
+  }
+
+  function selectGenero(g: string) {
+    const next = generoSelected === g ? "" : g
+    setGeneroSelected(next)
+    buildPublico(edadesSelected, next, publicoCustom)
+  }
+
+  function handlePublicoCustom(v: string) {
+    setPublicoCustom(v)
+    buildPublico(edadesSelected, generoSelected, v)
+  }
 
   return (
     <div className="space-y-8">
@@ -143,16 +205,62 @@ export default function Step2Brief() {
             placeholder="Ej. Aumentar ventas online 30% en mayo, generar 500 leads para evento presencial"
             className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
           />
+          <Chips options={OBJETIVOS} value={objetivoCampana} onSelect={(v) => setField("objetivoCampana", v)} />
         </Field>
 
         <Field label="Público objetivo" hint="opcional">
-          <input
-            type="text"
-            value={publicoObjetivo}
-            onChange={(e) => setField("publicoObjetivo", e.target.value)}
-            placeholder="Ej. Hombres 25-40 años, runners recreativos, NSE medio-alto, Bogotá"
-            className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
-          />
+          <div className="space-y-2.5">
+            {/* Género */}
+            <div className="flex gap-2">
+              {GENEROS.map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => selectGenero(g)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-xs border font-medium transition-all",
+                    generoSelected === g
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-muted/50 text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                  )}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+            {/* Edades */}
+            <div className="flex flex-wrap gap-1.5">
+              {EDADES.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => toggleEdad(e)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-full text-xs border transition-all",
+                    edadesSelected.includes(e)
+                      ? "border-primary bg-primary/10 text-primary font-medium"
+                      : "border-border bg-muted/50 text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                  )}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+            {/* Detalle libre */}
+            <input
+              type="text"
+              value={publicoCustom}
+              onChange={(e) => handlePublicoCustom(e.target.value)}
+              placeholder="Detalle adicional: NSE, ubicación, intereses, etc."
+              className="w-full h-9 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            {/* Preview */}
+            {publicoObjetivo && (
+              <p className="text-xs text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-lg">
+                → {publicoObjetivo}
+              </p>
+            )}
+          </div>
         </Field>
 
         <Field label="Insight o mensaje clave" hint="opcional">
@@ -184,6 +292,7 @@ export default function Step2Brief() {
               placeholder="Ej. Cercano, aspiracional, sin tecnicismos"
               className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
             />
+            <Chips options={TONOS} value={tonoYestilo} onSelect={(v) => setField("tonoYestilo", v)} />
           </Field>
 
           <Field label="Llamada a la acción (CTA)" hint="opcional">
@@ -194,6 +303,7 @@ export default function Step2Brief() {
               placeholder="Ej. Compra ahora, Obtén el tuyo"
               className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
             />
+            <Chips options={CTAS} value={llamadaAccion} onSelect={(v) => setField("llamadaAccion", v)} />
           </Field>
         </div>
 

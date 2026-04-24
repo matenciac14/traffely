@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 type NavItem = { href: string; label: string; icon: React.ElementType; exact?: boolean }
 
 const CLIENT_NAV: NavItem[] = [
+  { href: "/empresas", label: "Empresas", icon: BuildingIcon },
   { href: "/campaigns", label: "Campañas", icon: MegaphoneIcon },
   { href: "/board", label: "Board", icon: KanbanIcon },
   { href: "/settings", label: "Configuración", icon: SettingsIcon },

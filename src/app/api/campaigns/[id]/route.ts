@@ -71,6 +71,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         where: { id },
         data: {
           name: wizardState.nombreCampana || "Sin nombre",
+          empresaId: wizardState.empresaId || null,
           tipo: wizardState.tipoCampana === "evergreen" ? "EVERGREEN" : "ESTACIONAL",
           eventoEstacional: wizardState.eventoEstacional === "__custom__"
             ? wizardState.eventoCustom
@@ -128,6 +129,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         where: { id },
         data: {
           name: wizardState.nombreCampana || "Sin nombre",
+          empresaId: wizardState.empresaId || null,
           tipo: wizardState.tipoCampana === "evergreen" ? "EVERGREEN" : "ESTACIONAL",
           eventoEstacional: wizardState.eventoEstacional === "__custom__"
             ? wizardState.eventoCustom

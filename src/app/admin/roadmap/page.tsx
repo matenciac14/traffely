@@ -128,7 +128,7 @@ const ROADMAP: { fase: string; status: "done" | "in-progress" | "pending"; items
   },
   {
     fase: "Fase 9 — Wizard AI-First + Vista de campaña",
-    status: "in-progress" as const,
+    status: "done" as const,
     items: [
       { label: "Brief generado por IA persiste en DB y se muestra inline (briefGenerado)", done: true },
       { label: "Vista de campaña: sección 'Tareas del equipo' con assignee, prioridad, dueDate", done: true },
@@ -167,22 +167,82 @@ const ROADMAP: { fase: string; status: "done" | "in-progress" | "pending"; items
     fase: "Fase 11 — Shopify App Review (distribución pública)",
     status: "pending" as const,
     items: [
-      // ── Técnico (código) ─────────────────────────────────────────────────────
       { label: "[CÓDIGO] Webhook app/uninstalled → POST /api/webhooks/shopify/uninstalled → marca isActive:false en ShopifyIntegration", done: false },
       { label: "[CÓDIGO] Validar HMAC del webhook con X-Shopify-Hmac-Sha256 (mismo patrón que OAuth)", done: false },
       { label: "[CÓDIGO] Registrar el webhook automáticamente al completar OAuth callback", done: false },
-      // ── Partners dashboard ───────────────────────────────────────────────────
       { label: "[SHOPIFY] En Partners → App → Distribution → seleccionar 'Custom' (unlisted, no App Store)", done: false },
       { label: "[SHOPIFY] En Partners → App → Configuration → declarar scope 'read_products' y webhook app/uninstalled", done: false },
       { label: "[SHOPIFY] Subir app icon 1200×628px con logo Traffely", done: false },
       { label: "[SHOPIFY] Completar App listing: descripción, screenshots del wizard con Shopify conectado", done: false },
-      // ── Legal / Web ──────────────────────────────────────────────────────────
       { label: "[WEB] Crear página /privacy en traffely.com (Privacy Policy) — requerida por Shopify para el review", done: false },
       { label: "[WEB] Crear página /terms en traffely.com (Terms of Service) — recomendada", done: false },
-      // ── Review ───────────────────────────────────────────────────────────────
       { label: "[SHOPIFY] Enviar app a App Review desde Partners dashboard (tiempo estimado: 2–5 días hábiles)", done: false },
       { label: "[SHOPIFY] Responder feedback del reviewer si lo hay y re-enviar", done: false },
       { label: "[SHOPIFY] App aprobada → cualquier cliente puede conectar su tienda desde Traffely Settings", done: false },
+    ],
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  {
+    fase: "Fase 12 — Multi-Empresa (clientes/marcas por workspace)",
+    status: "in-progress" as const,
+    items: [
+      { label: "Modelo Empresa en Prisma: id, workspaceId, nombre, logo, industria, website, descripcion, isActive", done: true },
+      { label: "Modelo EmpresaIdentidad: tono, publicoObjetivo, propuestasValor, palabrasProhibidas, instruccionesExtra, colores, tipografias", done: true },
+      { label: "Migrar Campaign: agregar empresaId (FK opcional → campañas existentes sin empresa)", done: true },
+      { label: "Migrar ShopifyIntegration: mover de workspaceId → empresaId (pendiente Fase 12 avanzada)", done: false },
+      { label: "Migrar aiProfile de Workspace → EmpresaIdentidad (legacy queda como fallback)", done: true },
+      { label: "Campo empresasLimit en Workspace (sin enforcement aún — Fase 14)", done: false },
+      { label: "GET /api/empresas → listar empresas del workspace", done: true },
+      { label: "POST /api/empresas → crear empresa + EmpresaIdentidad vacía automáticamente", done: true },
+      { label: "GET /api/empresas/[id] → detalle con identidad + campañas recientes", done: true },
+      { label: "PATCH /api/empresas/[id] → editar datos generales inline", done: true },
+      { label: "PATCH /api/empresas/[id]/identidad → upsert identidad de marca", done: true },
+      { label: "DELETE /api/empresas/[id] → soft delete (isActive: false)", done: true },
+      { label: "Actualizar /api/integrations/shopify/* para operar por empresaId", done: false },
+      { label: "Página /empresas: listado con tarjetas, progress identidad IA, campañas", done: true },
+      { label: "Página /empresas/nueva: wizard 2 pasos (datos generales + identidad con 'completar después')", done: true },
+      { label: "Página /empresas/[id]: campos editables inline (click para editar), progress identidad IA", done: true },
+      { label: "Empresas en sidebar (nav CLIENT_NAV)", done: true },
+      { label: "Settings: mover tab 'Shopify' de workspace → dentro de /empresas/[id]", done: false },
+      { label: "Step 1 wizard: selector visual de empresa con tarjetas (carga desde API)", done: true },
+      { label: "Al seleccionar empresa: pre-cargar tono, público, propuestasValor en el brief", done: true },
+      { label: "Guardar empresaId en Campaign al autosave y al completar wizard", done: true },
+      { label: "Generate brief: usa EmpresaIdentidad si tiene empresaId, fallback a aiProfile del workspace", done: true },
+      { label: "ShopifyProductPicker: operar con empresaId en lugar de workspaceId", done: false },
+      { label: "Step 3 y Step 4: picker carga productos de la empresa seleccionada en Step 1", done: false },
+    ],
+  },
+
+  {
+    fase: "Fase 13 — Wizard refactorizado (AI-First con identidad de empresa)",
+    status: "pending" as const,
+    items: [
+      { label: "Reducir wizard a 5 pasos: Empresa + Brief rápido + Oferta + Estructura + Revisión", done: false },
+      { label: "Step 1 nuevo: selección de empresa (carga identidad) — ya no pide datos de marca en el wizard", done: false },
+      { label: "Step 2 nuevo: Brief campaña ligero — solo objetivo, contexto, fechas (tono/CTA vienen de empresa)", done: false },
+      { label: "Brief chips ya disponibles para objetivo, tono, CTA en Step 2", done: true },
+      { label: "Público objetivo con chips de edad/género en Step 2", done: true },
+      { label: "Step de Equipo: eliminar (se asigna desde el board después)", done: false },
+      { label: "Prompt maestro: combinar identidad empresa + brief campaña → output más preciso", done: false },
+      { label: "Opción 'Completar después' en brief opcional (avanzar sin brief completo, IA genera con lo que hay)", done: false },
+    ],
+  },
+
+  {
+    fase: "Fase 14 — Billing enforcement + planes",
+    status: "pending" as const,
+    items: [
+      { label: "Definir planes: Starter (1 empresa, 3 campañas, 20 gen/mes), Pro (5 empresas, ilimitadas, 100 gen/mes), Agency (todo ilimitado)", done: false },
+      { label: "Campo plan en Workspace: STARTER | PRO | AGENCY (default STARTER)", done: false },
+      { label: "Middleware de límites: verificar empresasLimit antes de crear empresa", done: false },
+      { label: "Middleware de límites: verificar campaignLimit en campañas activas", done: false },
+      { label: "Middleware de límites: verificar aiGenerationsLimit en generación IA", done: false },
+      { label: "UI upgrade prompt: modal cuando se alcanza el límite de empresas", done: false },
+      { label: "UI upgrade prompt: banner cuando se alcanza el 80% de generaciones IA", done: false },
+      { label: "Panel admin SUPER_ADMIN: cambiar plan de workspace manualmente", done: false },
+      { label: "Stripe integration (suscripciones) — reemplaza billing manual", done: false },
+      { label: "Webhooks Stripe → activar plan automáticamente al pagar", done: false },
     ],
   },
 ]
