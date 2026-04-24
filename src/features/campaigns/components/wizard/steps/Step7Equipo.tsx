@@ -11,8 +11,11 @@ export default function Step7Equipo() {
       <div>
         <h2 className="text-xl font-semibold text-foreground">Equipo de la campaña</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Define quién recibe el prompt maestro y gestiona esta campaña.
+          Estos roles aparecen en el prompt maestro para que Claude sepa a quién va dirigido cada entregable.
         </p>
+        <div className="mt-3 px-3 py-2 rounded-lg bg-muted/60 border border-border text-xs text-muted-foreground">
+          💡 Para invitar personas al workspace ve a <strong>Configuración → Equipo</strong>. Esto es solo para el brief.
+        </div>
       </div>
 
       <div className="space-y-2">

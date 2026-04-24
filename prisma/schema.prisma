@@ -91,11 +91,53 @@ model Workspace {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users     User[]
-  campaigns Campaign[]
-  aiUsage   AiUsage[]
+  users              User[]
+  empresas           Empresa[]
+  campaigns          Campaign[]
+  aiUsage            AiUsage[]
+  shopifyIntegration ShopifyIntegration?
 
   @@map("workspaces")
+}
+
+model Empresa {
+  id          String   @id @default(cuid())
+  workspaceId String
+  nombre      String
+  logo        String?
+  industria   String?
+  website     String?
+  descripcion String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace  Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  identidad  EmpresaIdentidad?
+  campaigns  Campaign[]
+
+  @@index([workspaceId])
+  @@map("empresas")
+}
+
+model EmpresaIdentidad {
+  id        String @id @default(cuid())
+  empresaId String @unique
+
+  tono               String?
+  publicoObjetivo    String?
+  propuestasValor    String?
+  palabrasProhibidas String?
+  instruccionesExtra String?
+  colores            String?
+  tipografias        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@map("empresa_identidades")
 }
 
 model User {
@@ -122,6 +164,7 @@ model User {
 model Campaign {
   id          String         @id @default(cuid())
   workspaceId String
+  empresaId   String?
   createdById String
 
   name             String
@@ -146,12 +189,17 @@ model Campaign {
   promptMaestro String?
   promptVersion String  @default("v1.0")
 
+  // Contenido generado por IA (brief creativo completo)
+  briefGenerado   String?
+  briefGeneradoAt DateTime?
+
   isArchived Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   workspace Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  empresa   Empresa?          @relation(fields: [empresaId], references: [id])
   createdBy User              @relation("CampaignCreator", fields: [createdById], references: [id])
   adSets    AdSet[]
   auditLogs AuditLog[]
@@ -159,6 +207,7 @@ model Campaign {
   comments  Comment[]
 
   @@index([workspaceId])
+  @@index([empresaId])
   @@index([createdById])
   @@index([status])
   @@map("campaigns")
@@ -300,6 +349,22 @@ model AiUsage {
   @@index([workspaceId])
   @@index([campaignId])
   @@map("ai_usage")
+}
+
+model ShopifyIntegration {
+  id          String    @id @default(cuid())
+  workspaceId String    @unique
+  shop        String                          // "mitienda.myshopify.com"
+  accessToken String                          // cifrado AES-256-GCM
+  scope       String
+  isActive    Boolean   @default(true)
+  lastSyncAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@map("shopify_integrations")
 }
 
 model Notification {

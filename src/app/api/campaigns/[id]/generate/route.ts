@@ -3,28 +3,47 @@ import { db } from "@/lib/db/prisma"
 import { getAiClient, AI_MODEL, SYSTEM_PROMPT } from "@/lib/ai/client"
 import { rateLimit } from "@/lib/ratelimit"
 
-function buildSystemPrompt(aiProfile: Record<string, string> | null): string {
-  if (!aiProfile) return SYSTEM_PROMPT
+interface EmpresaIdentidad {
+  tono: string | null
+  publicoObjetivo: string | null
+  propuestasValor: string | null
+  palabrasProhibidas: string | null
+  instruccionesExtra: string | null
+}
 
+function buildSystemPrompt(
+  aiProfile: Record<string, string> | null,
+  empresaIdentidad?: EmpresaIdentidad | null
+): string {
   const sections: string[] = [SYSTEM_PROMPT]
 
-  if (aiProfile.descripcionEmpresa?.trim())
-    sections.push(`\n## CONTEXTO DEL CLIENTE\n${aiProfile.descripcionEmpresa.trim()}`)
-
-  if (aiProfile.publicoObjetivo?.trim())
-    sections.push(`\n## PÚBLICO OBJETIVO DEL CLIENTE\n${aiProfile.publicoObjetivo.trim()}`)
-
-  if (aiProfile.tonoMarca?.trim())
-    sections.push(`\n## TONO Y VOZ DE LA MARCA\n${aiProfile.tonoMarca.trim()}`)
-
-  if (aiProfile.propuestasValorFijas?.trim())
-    sections.push(`\n## PROPUESTAS DE VALOR FIJAS (incluir siempre que aplique)\n${aiProfile.propuestasValorFijas.trim()}`)
-
-  if (aiProfile.palabrasProhibidas?.trim())
-    sections.push(`\n## PALABRAS/FRASES PROHIBIDAS (adicionales)\n${aiProfile.palabrasProhibidas.trim()}`)
-
-  if (aiProfile.instruccionesExtra?.trim())
-    sections.push(`\n## INSTRUCCIONES ADICIONALES DEL CLIENTE\n${aiProfile.instruccionesExtra.trim()}`)
+  // Identidad de empresa (Fase 12 — prioridad sobre aiProfile del workspace)
+  if (empresaIdentidad) {
+    if (empresaIdentidad.tono?.trim())
+      sections.push(`\n## TONO Y VOZ DE LA MARCA\n${empresaIdentidad.tono.trim()}`)
+    if (empresaIdentidad.publicoObjetivo?.trim())
+      sections.push(`\n## PÚBLICO OBJETIVO DEL CLIENTE\n${empresaIdentidad.publicoObjetivo.trim()}`)
+    if (empresaIdentidad.propuestasValor?.trim())
+      sections.push(`\n## PROPUESTAS DE VALOR FIJAS (incluir siempre que aplique)\n${empresaIdentidad.propuestasValor.trim()}`)
+    if (empresaIdentidad.palabrasProhibidas?.trim())
+      sections.push(`\n## PALABRAS/FRASES PROHIBIDAS\n${empresaIdentidad.palabrasProhibidas.trim()}`)
+    if (empresaIdentidad.instruccionesExtra?.trim())
+      sections.push(`\n## INSTRUCCIONES ADICIONALES\n${empresaIdentidad.instruccionesExtra.trim()}`)
+  } else if (aiProfile) {
+    // Fallback: usar aiProfile del workspace (legacy)
+    if (aiProfile.descripcionEmpresa?.trim())
+      sections.push(`\n## CONTEXTO DEL CLIENTE\n${aiProfile.descripcionEmpresa.trim()}`)
+    if (aiProfile.publicoObjetivo?.trim())
+      sections.push(`\n## PÚBLICO OBJETIVO DEL CLIENTE\n${aiProfile.publicoObjetivo.trim()}`)
+    if (aiProfile.tonoMarca?.trim())
+      sections.push(`\n## TONO Y VOZ DE LA MARCA\n${aiProfile.tonoMarca.trim()}`)
+    if (aiProfile.propuestasValorFijas?.trim())
+      sections.push(`\n## PROPUESTAS DE VALOR FIJAS (incluir siempre que aplique)\n${aiProfile.propuestasValorFijas.trim()}`)
+    if (aiProfile.palabrasProhibidas?.trim())
+      sections.push(`\n## PALABRAS/FRASES PROHIBIDAS (adicionales)\n${aiProfile.palabrasProhibidas.trim()}`)
+    if (aiProfile.instruccionesExtra?.trim())
+      sections.push(`\n## INSTRUCCIONES ADICIONALES DEL CLIENTE\n${aiProfile.instruccionesExtra.trim()}`)
+  }
 
   return sections.join("\n")
 }
@@ -59,7 +78,10 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const [campaign, workspace] = await Promise.all([
     db.campaign.findUnique({
       where: { id, workspaceId: session.user.workspaceId },
-      select: { id: true, promptMaestro: true },
+      select: {
+        id: true, promptMaestro: true, empresaId: true,
+        empresa: { include: { identidad: true } },
+      },
     }),
     db.workspace.findUnique({
       where: { id: session.user.workspaceId },
@@ -99,7 +121,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   const aiClient = getAiClient(resolvedKey)
   const aiProfile = workspace?.aiProfile as Record<string, string> | null
-  const systemPrompt = buildSystemPrompt(aiProfile)
+  const empresaIdentidad = campaign.empresa?.identidad ?? null
+  const systemPrompt = buildSystemPrompt(aiProfile, empresaIdentidad)
   const workspaceId = session.user.workspaceId
 
   const stream = aiClient.messages.stream({
@@ -114,6 +137,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
       const encoder = new TextEncoder()
       let inputTokens = 0
       let outputTokens = 0
+      let fullText = ""
 
       try {
         for await (const event of stream) {
@@ -121,6 +145,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
             inputTokens = event.message.usage.input_tokens
           }
           if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            fullText += event.delta.text
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`)
             )
@@ -129,6 +154,12 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
             outputTokens = event.usage.output_tokens
           }
         }
+
+        // Save generated brief to DB
+        await db.campaign.update({
+          where: { id },
+          data: { briefGenerado: fullText, briefGeneradoAt: new Date() },
+        })
 
         // Track cost ($5/1M input, $25/1M output — Opus 4.6)
         const costUsd = (inputTokens * 5 + outputTokens * 25) / 1_000_000
