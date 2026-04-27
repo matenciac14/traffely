@@ -3,10 +3,56 @@ import { db } from "@/lib/db/prisma"
 import { getAiClient, AI_MODEL, SYSTEM_PROMPT } from "@/lib/ai/client"
 import { rateLimit } from "@/lib/ratelimit"
 import { logger } from "@/lib/logger"
+import { decrypt } from "@/lib/utils/crypto"
 
 function sanitize(text: string | null | undefined): string {
   if (!text) return ""
   return text.replace(/[`*_#\\]/g, (c) => `\\${c}`).slice(0, 2000)
+}
+
+interface EmpresaIdentidad {
+  tono: string | null
+  publicoObjetivo: string | null
+  propuestasValor: string | null
+  palabrasProhibidas: string | null
+  instruccionesExtra: string | null
+}
+
+/** Construye el system prompt combinando SYSTEM_PROMPT base + identidad de empresa o aiProfile workspace */
+function buildSystemPrompt(
+  aiProfile: Record<string, string> | null,
+  empresaIdentidad?: EmpresaIdentidad | null
+): string {
+  const sections: string[] = [SYSTEM_PROMPT]
+
+  if (empresaIdentidad) {
+    if (empresaIdentidad.tono?.trim())
+      sections.push(`\n## TONO Y VOZ DE LA MARCA\n${empresaIdentidad.tono.trim()}`)
+    if (empresaIdentidad.publicoObjetivo?.trim())
+      sections.push(`\n## PÚBLICO OBJETIVO DEL CLIENTE\n${empresaIdentidad.publicoObjetivo.trim()}`)
+    if (empresaIdentidad.propuestasValor?.trim())
+      sections.push(`\n## PROPUESTAS DE VALOR FIJAS (incluir siempre que aplique)\n${empresaIdentidad.propuestasValor.trim()}`)
+    if (empresaIdentidad.palabrasProhibidas?.trim())
+      sections.push(`\n## PALABRAS/FRASES PROHIBIDAS\n${empresaIdentidad.palabrasProhibidas.trim()}`)
+    if (empresaIdentidad.instruccionesExtra?.trim())
+      sections.push(`\n## INSTRUCCIONES ADICIONALES\n${empresaIdentidad.instruccionesExtra.trim()}`)
+  } else if (aiProfile) {
+    // Fallback: perfil de IA legacy del workspace
+    if (aiProfile.tonoMarca?.trim())
+      sections.push(`\n## TONO Y VOZ DE LA MARCA\n${sanitize(aiProfile.tonoMarca)}`)
+    if (aiProfile.publicoObjetivo?.trim())
+      sections.push(`\n## PÚBLICO OBJETIVO\n${sanitize(aiProfile.publicoObjetivo)}`)
+    if (aiProfile.propuestasValorFijas?.trim())
+      sections.push(`\n## PROPUESTAS DE VALOR FIJAS\n${sanitize(aiProfile.propuestasValorFijas)}`)
+    if (aiProfile.palabrasProhibidas?.trim())
+      sections.push(`\n## PALABRAS/FRASES PROHIBIDAS\n${sanitize(aiProfile.palabrasProhibidas)}`)
+    if (aiProfile.instruccionesExtra?.trim())
+      sections.push(`\n## INSTRUCCIONES ADICIONALES\n${sanitize(aiProfile.instruccionesExtra)}`)
+    if (aiProfile.descripcionEmpresa?.trim())
+      sections.push(`\n## CONTEXTO DEL NEGOCIO\n${sanitize(aiProfile.descripcionEmpresa)}`)
+  }
+
+  return sections.join("\n")
 }
 
 export async function POST(
@@ -22,12 +68,12 @@ export async function POST(
   const workspaceId = session.user.workspaceId
 
   // Rate limit: 10 generaciones de IA por workspace por día
-  const rl = rateLimit(`ai_gen:${workspaceId}`, 10)
+  const rl = await rateLimit(`ai_gen:${workspaceId}`, 10)
   if (!rl.allowed) {
     return new Response("Límite de generaciones IA alcanzado (10/día)", { status: 429 })
   }
 
-  // Load piece (workspace-scoped)
+  // Load piece con empresa.identidad cuando existe
   const piece = await db.piece.findFirst({
     where: { id, adSet: { campaign: { workspaceId } } },
     select: {
@@ -40,8 +86,25 @@ export async function POST(
           nombre: true,
           campaign: {
             select: {
-              id: true, name: true,
-              workspace: { select: { aiProfile: true, aiApiKey: true, aiProvider: true, globalAiEnabled: true } },
+              id: true,
+              name: true,
+              empresa: {
+                select: {
+                  nombre: true,
+                  identidad: {
+                    select: {
+                      tono: true,
+                      publicoObjetivo: true,
+                      propuestasValor: true,
+                      palabrasProhibidas: true,
+                      instruccionesExtra: true,
+                    },
+                  },
+                },
+              },
+              workspace: {
+                select: { aiProfile: true, aiApiKey: true, aiProvider: true, globalAiEnabled: true },
+              },
             },
           },
         },
@@ -53,16 +116,23 @@ export async function POST(
     return new Response("Pieza no encontrada", { status: 404 })
   }
 
-  const aiProfile = piece.adSet.campaign.workspace.aiProfile as Record<string, string> | null
-  const workspaceAiKey = piece.adSet.campaign.workspace.aiApiKey ?? null
-  const canUseGlobalKey = !!piece.adSet.campaign.workspace.globalAiEnabled && !!process.env.ANTHROPIC_API_KEY
+  const campaign = piece.adSet.campaign
+  const empresaIdentidad = campaign.empresa?.identidad ?? null
+  const aiProfile = campaign.workspace.aiProfile as Record<string, string> | null
+  const encryptedKey = campaign.workspace.aiApiKey ?? null
+  const workspaceAiKey = encryptedKey ? (() => { try { return decrypt(encryptedKey) } catch { return null } })() : null
+  const canUseGlobalKey = !!campaign.workspace.globalAiEnabled && !!process.env.ANTHROPIC_API_KEY
   const resolvedKey = workspaceAiKey || (canUseGlobalKey ? process.env.ANTHROPIC_API_KEY : undefined)
   const hasApiKey = !!resolvedKey
   const aiClient = getAiClient(resolvedKey)
 
-  // Build prompt
+  const systemPrompt = buildSystemPrompt(aiProfile, empresaIdentidad)
+
+  // Build user prompt con contexto de la pieza
+  const empresaNombre = campaign.empresa?.nombre ?? null
   const pieceContext = [
-    `Campaña: ${sanitize(piece.adSet.campaign.name)}`,
+    empresaNombre ? `Empresa/marca: ${sanitize(empresaNombre)}` : "",
+    `Campaña: ${sanitize(campaign.name)}`,
     `Conjunto: ${sanitize(piece.adSet.nombre)}`,
     `Modelo/UGC: ${sanitize(piece.modelo)}`,
     `Tipo de pieza: ${sanitize(piece.tipoPieza)}`,
@@ -77,20 +147,9 @@ export async function POST(
     piece.carruselSlides ? `Slides del carrusel: ${piece.carruselSlides}` : "",
   ].filter(Boolean).join("\n")
 
-  const profileContext = aiProfile ? [
-    aiProfile.descripcionEmpresa ? `Empresa: ${sanitize(aiProfile.descripcionEmpresa)}` : "",
-    aiProfile.publicoObjetivo ? `Público objetivo: ${sanitize(aiProfile.publicoObjetivo)}` : "",
-    aiProfile.tonoMarca ? `Tono de marca: ${sanitize(aiProfile.tonoMarca)}` : "",
-    aiProfile.propuestasValorFijas ? `Propuestas de valor: ${sanitize(aiProfile.propuestasValorFijas)}` : "",
-    aiProfile.palabrasProhibidas ? `Palabras prohibidas (NUNCA usar): ${sanitize(aiProfile.palabrasProhibidas)}` : "",
-    aiProfile.instruccionesExtra ? `Instrucciones extra: ${sanitize(aiProfile.instruccionesExtra)}` : "",
-  ].filter(Boolean).join("\n") : ""
-
   const userPrompt = `Genera el guión y copy para esta pieza publicitaria de Meta Ads:
 
 ${pieceContext}
-
-${profileContext ? `\nPerfil de marca:\n${profileContext}` : ""}
 
 Responde con:
 
@@ -130,7 +189,7 @@ Responde con:
         const claudeStream = aiClient.messages.stream({
           model: AI_MODEL,
           max_tokens: 4000,
-          system: SYSTEM_PROMPT,
+          system: systemPrompt,
           messages: [{ role: "user", content: userPrompt }],
         })
 
@@ -154,11 +213,7 @@ Responde con:
         // Save to DB
         await db.piece.update({
           where: { id: piece.id },
-          data: {
-            guionGenerado,
-            copyGenerado,
-            aiGeneratedAt: new Date(),
-          },
+          data: { guionGenerado, copyGenerado, aiGeneratedAt: new Date() },
         })
 
         // Track usage
@@ -166,7 +221,7 @@ Responde con:
           data: {
             workspaceId,
             pieceId: piece.id,
-            campaignId: piece.adSet.campaign.id,
+            campaignId: campaign.id,
             inputTokens,
             outputTokens,
             model: AI_MODEL,

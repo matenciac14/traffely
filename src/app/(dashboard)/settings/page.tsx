@@ -26,6 +26,7 @@ export default async function SettingsPage({
     select: {
       name: true, slug: true, plan: true, aiProfile: true,
       metaAdAccountId: true, metaEnabled: true,
+      shopifyEnabled: true,
       monthlyFee: true, setupFee: true, billingStatus: true,
       billingPlan: true, billingCycle: true, nextBillingDate: true,
     },
@@ -40,7 +41,7 @@ export default async function SettingsPage({
     ...(isOwner ? [{ key: "api-keys", label: "API Keys" }] : []),
     ...(isOwner ? [{ key: "billing",  label: "Facturación" }] : []),
     ...(workspace?.metaEnabled ? [{ key: "meta", label: "Meta Ads" }] : []),
-    ...(isOwner ? [{ key: "shopify", label: "Shopify" }] : []),
+    ...(isOwner && workspace?.shopifyEnabled ? [{ key: "shopify", label: "Shopify" }] : []),
   ]
 
   return (

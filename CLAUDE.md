@@ -128,16 +128,21 @@ Workspace (agencia/cuenta)
 | PRO | 5 | ilimitadas | 100 |
 | AGENCY | ilimitadas | ilimitadas | ilimitadas |
 
-## Integración Shopify (Fase 10 — migrará a por-empresa en Fase 12)
+## Integración Shopify (Fase 10 — feature-flagged)
 - **Objetivo**: catálogo read-only para importar productos/variantes en el wizard
 - **Modelo DB actual**: `ShopifyIntegration` (workspaceId unique, shop, accessToken cifrado AES-256-GCM, scope, isActive)
 - **⚠️ Fase 12**: migrar `workspaceId` → `empresaId` (cada empresa tiene su propia tienda Shopify)
+- **Feature flag** ✅: campo `shopifyEnabled Boolean @default(false)` en Workspace
+  - Toggle por SUPER_ADMIN en panel admin (`WorkspaceActions` → acción `"shopify"`)
+  - Settings tab "Shopify" solo visible si `shopifyEnabled = true` ✅
+  - API routes `/integrations/shopify/*` retornan 503 si flag desactivado ✅
+  - ShopifyProductPicker muestra error si API retorna 503 (comportamiento esperado)
 - **OAuth**: `POST /api/integrations/shopify/connect` → URL → Shopify → `GET /api/integrations/shopify/callback`
 - **Estado/desconectar**: `GET|DELETE /api/integrations/shopify`
 - **Productos on-demand**: `GET /api/integrations/shopify/products` → llama API Shopify en tiempo real
 - **Scope**: `read_products` únicamente — sin acceso a pedidos, clientes ni escritura
 - **Env vars**: `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET` (crear App privada en Shopify Partners)
-- **State OAuth**: in-memory Map con TTL 10min (MVP — migrar a Redis si hay multi-instancia)
+- **State OAuth**: in-memory Map con TTL 10min — **migrar a Upstash Redis en Fase 15**
 - **Uso en wizard**:
   - Step 3 Oferta: `ShopifyProductPicker` → pre-fill `contextoOferta` con nombre + precio
   - Step 4 Modelos: `ShopifyProductPicker` → importa variantes como modelos con precios
@@ -147,9 +152,18 @@ Workspace (agencia/cuenta)
 ## IA — Generación de brief
 - Endpoint: `POST /api/campaigns/[id]/generate` → SSE stream
 - Modelo: `claude-opus-4-6`, `max_tokens: 16000`
-- Sistema: `SYSTEM_PROMPT` + perfil IA del workspace (`aiProfile` en Workspace)
-- Fallback: mock stream si no hay `ANTHROPIC_API_KEY` o falla auth
+- Sistema: `SYSTEM_PROMPT` genérico (agencia marketing LatAm) + identidad de empresa si hay `empresaId`
+- Contexto IA: si campaña tiene `empresaId` → usa `EmpresaIdentidad`; si no → usa `aiProfile` del workspace
+- Fallback: mock stream si no hay key disponible
 - Tracking: `AiUsage` — $5/1M input, $25/1M output
+- **⚠️ Rate limiting**: actualmente in-memory — migrar a Upstash Redis en Fase 15
+- **Fase 16**: output será JSON estructurado por secciones, guardado en `Campaign.briefData`
+
+## IA — SYSTEM_PROMPT
+- **Regla**: el `SYSTEM_PROMPT` en `lib/ai/client.ts` debe ser GENÉRICO (agencia marketing LatAm)
+- **NO incluir**: industria específica, cliente específico, calzado, Colombia exclusivo
+- **El contexto de negocio viene de**: `EmpresaIdentidad` (si hay empresa) o `aiProfile` (workspace legacy)
+- **Identidad de empresa demo**: "Serrano Group Calzado" tiene su identidad en `EmpresaIdentidad` en DB (seed)
 
 ## Gestión de equipo (Workspace)
 - OWNER puede invitar, cambiar rol y desactivar miembros
@@ -240,9 +254,18 @@ Campos en `aiProfile Json?` de Workspace:
 
 ## Billing + AI Keys (Fase 8 parcial)
 - OWNER ve billing en settings: plan, estado, próximo cobro (datos del workspace, editados por SUPER_ADMIN)
-- OWNER puede configurar su propia API key de IA (Anthropic/OpenAI/Gemini)
+- OWNER puede configurar su propia API key de IA (Anthropic/OpenAI/Gemini) en Settings → tab IA
 - AI key cifrada con AES-256-GCM usando `ENCRYPTION_KEY` (64 hex chars en env)
-- Los endpoints de generación usan la key del workspace si está configurada, sino la global
+
+### Lógica de resolución de API key (en generate routes)
+```
+1. workspace.aiApiKey presente → decrypt() → usar esa key
+2. Si no hay key propia: workspace.globalAiEnabled = true → usar ANTHROPIC_API_KEY de plataforma (.env)
+3. Si ninguna de las dos → fallback mock stream (sin IA real)
+```
+- **CRÍTICO**: `workspace.aiApiKey` se guarda **encriptado**. Los generate routes deben llamar `decrypt()` antes de pasarlo al SDK. Sin esto, Anthropic rechaza con 401 y cae silenciosamente al mock.
+- `globalAiEnabled` lo activa el SUPER_ADMIN por workspace desde el panel admin (`/admin/workspaces/[id]`)
+- Por defecto `globalAiEnabled = false` — workspace nuevo no tiene acceso a la key de plataforma hasta que el admin lo active
 
 ## Seguridad — implementado
 - Security headers (CSP, X-Frame-Options, nosniff, Referrer-Policy)
@@ -263,10 +286,57 @@ Campos en `aiProfile Json?` de Workspace:
 - Rate limiting en registro (anti-spam)
 - Verificación de email al invitar usuarios
 - Google OAuth (requiere credenciales — eliminado por ahora)
-- Notificaciones por email (invitación, cambio estado)
-- Rate limiting Redis/Upstash para producción (reemplazar in-memory)
+- Notificaciones por email con Resend (invitación, asignación, cambio estado) — Fase 15
+- Rate limiting Redis/Upstash para producción (reemplazar in-memory) — Fase 15 P1
+- Shopify OAuth state → Redis (multi-instancia) — Fase 15 P1
 - Fix CSP (remover unsafe-inline/eval)
 - CSRF tokens en formularios POST
+
+## Board Pro — inspirado en ClickUp (Fase 17)
+
+### Features seleccionadas para replicar (filtradas para producción creativa)
+| Feature | Descripción | Prioridad |
+|---------|-------------|-----------|
+| **Prioridad visible en card** | Badge URGENTE/ALTA/MEDIA/BAJA en PieceCard | Alta |
+| **Due date en card** | Días restantes / vencida (rojo) visible sin abrir drawer | Alta |
+| **Activity feed por pieza** | Historial de cambios de estado + asignaciones en drawer | Alta |
+| **Workload view** | Vista agrupada por creativo — carga y semáforo visual | Alta |
+| **Timeline ligero** | Piezas en eje de tiempo por dueDate, drag-and-drop fechas | Media |
+| **Dashboard por campaña** | Widgets: % progreso, IA generada, días al lanzamiento, carga equipo | Media |
+| **Checklist por pieza** | Lista de verificación antes de APROBADO, templates por tipo | Media |
+| **Subpiezas** | Variantes de un mismo ad (mismo guión, distintos formatos) | Baja |
+
+### Features de ClickUp que NO replicamos
+- Whiteboards / Mind Maps — fuera del core
+- Timesheets / time tracking — no es nuestro modelo de negocio
+- Sprints / Sprint Points — flujo de estados ya cubre esto
+- Integraciones genéricas (1000+) — solo Meta Ads y Shopify
+- Super Agents IA autónomos — fuera del MVP
+
+## Brief nativo en plataforma (Fase 16)
+- **Decisión de producto**: el brief NO se exporta a Word — vive dentro de Traffely
+- **Arquitectura**:
+  - Claude genera JSON estructurado con secciones fijas (resumen, público, oferta, piezas con guiones/copys)
+  - Se guarda en `Campaign.briefData` (campo Json?)
+  - Se renderiza en `/campaigns/[id]` con diseño nativo
+- **Plan de trabajo IA**: segundo call Claude post-brief genera prioridades y timelines por pieza
+  - Output JSON: `[{ pieceId, priority, suggestedDueDate, notes }]`
+  - OWNER confirma antes de aplicar a la DB
+- **Export PDF**: vía `window.print()` con CSS print styles (sin backend extra)
+- **Backward compat**: campañas existentes con `promptMaestro` texto plano siguen mostrándose
+
+## Dashboard de métricas (Fase 19)
+- Ruta `/metrics` — OWNER y SUPER_ADMIN
+- KPIs producción: campañas activas, piezas por estado, on-time rate, carga equipo, IA usada vs límite
+- Vistas: global workspace → por empresa → por campaña
+- Sin Meta Ads: producción metrics + placeholder ROAS/CPC (se activan con Fase 7)
+- Export CSV para reportes al cliente
+
+## Chat de equipo (Fase 20)
+- Scope mínimo: canal #general + canal por campaña (NO Slack completo)
+- **Decisión de producto**: implementar solo si clientes lo piden explícitamente
+- Polling 10s en MVP (sin WebSocket/Pusher)
+- Menciones @usuario + link /pieza contextual
 
 ## Ver también
 ~/.claude/CLAUDE.md para reglas globales de Miguel

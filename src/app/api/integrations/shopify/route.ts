@@ -7,6 +7,14 @@ export async function GET() {
   const session = await auth()
   if (!session?.user?.workspaceId) return NextResponse.json({ error: "No autorizado" }, { status: 401 })
 
+  const ws = await db.workspace.findUnique({
+    where: { id: session.user.workspaceId },
+    select: { shopifyEnabled: true },
+  })
+  if (!ws?.shopifyEnabled) {
+    return NextResponse.json({ error: "Shopify no está habilitado para este workspace" }, { status: 503 })
+  }
+
   const integration = await db.shopifyIntegration.findUnique({
     where: { workspaceId: session.user.workspaceId },
     select: { shop: true, scope: true, isActive: true, lastSyncAt: true },
@@ -28,6 +36,14 @@ export async function DELETE() {
   const session = await auth()
   if (!session?.user?.workspaceId || !["OWNER", "SUPER_ADMIN"].includes(session.user.role ?? "")) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 })
+  }
+
+  const wsForDelete = await db.workspace.findUnique({
+    where: { id: session.user.workspaceId },
+    select: { shopifyEnabled: true },
+  })
+  if (!wsForDelete?.shopifyEnabled) {
+    return NextResponse.json({ error: "Shopify no está habilitado para este workspace" }, { status: 503 })
   }
 
   try {

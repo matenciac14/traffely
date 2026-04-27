@@ -88,6 +88,9 @@ model Workspace {
   // IA global — SUPER_ADMIN habilita uso de la API key global de Traffely
   globalAiEnabled Boolean @default(false)
 
+  // Feature flag Shopify — SUPER_ADMIN activa/desactiva por workspace
+  shopifyEnabled  Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -109,6 +112,13 @@ model Empresa {
   website     String?
   descripcion String?
   isActive    Boolean  @default(true)
+
+  // Integración Meta Ads por empresa
+  metaAdAccountId    String?
+  metaAccessToken    String?   // AES-256-GCM encrypted
+  metaTokenExpiresAt DateTime?
+  metaEnabled        Boolean  @default(false)
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

@@ -8,6 +8,7 @@ import {
   MegaphoneIcon, GlobeIcon, Trash2Icon, BrainCircuitIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import MetaConnectionCard from "./MetaConnectionCard"
 
 const INDUSTRIAS: Record<string, string> = {
   ecommerce: "E-commerce", moda: "Moda", belleza: "Belleza",
@@ -32,6 +33,7 @@ interface EmpresaIdentidad {
 interface EmpresaData {
   id: string; nombre: string; industria: string | null; website: string | null
   descripcion: string | null; logo: string | null; isActive: boolean
+  metaEnabled: boolean; metaAdAccountId: string | null
   identidad: EmpresaIdentidad | null
   _count: { campaigns: number }
   campaigns: { id: string; name: string; status: string; createdAt: string }[]
@@ -227,6 +229,14 @@ export default function EmpresaDetailPage() {
             multiline onSave={(v) => patchIdentidad({ instruccionesExtra: v })} />
         </div>
       </div>
+
+      {/* ── Meta Ads ─────────────────────────────────────────────────── */}
+      <MetaConnectionCard
+        empresaId={empresa.id}
+        initialConnected={empresa.metaEnabled}
+        initialAccountName={null}
+        initialAdAccountId={empresa.metaAdAccountId}
+      />
 
       {/* ── Campañas recientes ───────────────────────────────────────── */}
       {empresa.campaigns.length > 0 && (

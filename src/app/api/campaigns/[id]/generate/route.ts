@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db/prisma"
 import { getAiClient, AI_MODEL, SYSTEM_PROMPT } from "@/lib/ai/client"
 import { rateLimit } from "@/lib/ratelimit"
+import { decrypt } from "@/lib/utils/crypto"
 
 interface EmpresaIdentidad {
   tono: string | null
@@ -94,7 +95,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   }
 
   // Rate limit: 10 generaciones IA por workspace cada 24h
-  const rl = rateLimit(`ai_gen:${session.user.workspaceId}`, 10)
+  const rl = await rateLimit(`ai_gen:${session.user.workspaceId}`, 10)
   if (!rl.allowed) {
     const resetIn = Math.ceil((rl.resetAt - Date.now()) / 1000 / 60)
     return new Response(
@@ -109,7 +110,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     "Connection": "keep-alive",
   }
 
-  const workspaceAiKey = workspace?.aiApiKey ?? null
+  const encryptedKey = workspace?.aiApiKey ?? null
+  const workspaceAiKey = encryptedKey ? (() => { try { return decrypt(encryptedKey) } catch { return null } })() : null
   const canUseGlobalKey = !!workspace?.globalAiEnabled && !!process.env.ANTHROPIC_API_KEY
   const resolvedKey = workspaceAiKey || (canUseGlobalKey ? process.env.ANTHROPIC_API_KEY : undefined)
   const hasApiKey = !!resolvedKey

@@ -9,6 +9,14 @@ export async function GET() {
   const session = await auth()
   if (!session?.user?.workspaceId) return NextResponse.json({ error: "No autorizado" }, { status: 401 })
 
+  const ws = await db.workspace.findUnique({
+    where: { id: session.user.workspaceId },
+    select: { shopifyEnabled: true },
+  })
+  if (!ws?.shopifyEnabled) {
+    return NextResponse.json({ error: "Shopify no está habilitado para este workspace" }, { status: 503 })
+  }
+
   const integration = await db.shopifyIntegration.findUnique({
     where: { workspaceId: session.user.workspaceId },
     select: { shop: true, accessToken: true, isActive: true },

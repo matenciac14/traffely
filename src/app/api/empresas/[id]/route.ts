@@ -23,7 +23,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   })
 
   if (!empresa) return NextResponse.json({ error: "Not found" }, { status: 404 })
-  return NextResponse.json(empresa)
+
+  // Excluir token cifrado del response — solo el cliente necesita saber si está conectado
+  const { metaAccessToken: _token, ...safeEmpresa } = empresa
+  return NextResponse.json(safeEmpresa)
 }
 
 // PATCH /api/empresas/[id] — editar datos generales

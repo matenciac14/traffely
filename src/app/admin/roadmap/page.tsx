@@ -245,6 +245,185 @@ const ROADMAP: { fase: string; status: "done" | "in-progress" | "pending"; items
       { label: "Webhooks Stripe → activar plan automáticamente al pagar", done: false },
     ],
   },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ANÁLISIS TÉCNICO + INSPIRACIÓN CLICKUP 2026-04-27
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  {
+    fase: "Fase 15 — Deuda técnica crítica (fixes de producción)",
+    status: "in-progress" as const,
+    items: [
+      { label: "[P1] Rate limiting: migrar in-memory Map → Upstash Redis (persiste entre deploys)", done: true },
+      { label: "[P1] Shopify OAuth state: migrar in-memory Map → Upstash Redis (multi-instancia)", done: true },
+      { label: "[P2] Fix pieces/[id]/generate: usar EmpresaIdentidad cuando campaña tiene empresaId", done: true },
+      { label: "[P2] Fix campaigns/[id]/generate: ya usa EmpresaIdentidad correctamente (verificado)", done: true },
+      { label: "[P3] Eliminar SYSTEM_PROMPT hardcodeado de lib/ai/client.ts (era específico de calzado)", done: true },
+      { label: "[P3] SYSTEM_PROMPT genérico: agencia marketing LatAm, sin industria fija, sin cliente específico", done: true },
+      { label: "[P3] Seed: crear empresa 'Serrano Group' con identidad completa como EmpresaIdentidad en DB", done: true },
+      { label: "[P3] Verificar backward compat: campañas sin empresaId siguen usando aiProfile workspace", done: true },
+      { label: "[P4] Feature flag SHOPIFY_ENABLED: campo en Workspace + toggle por SUPER_ADMIN", done: true },
+      { label: "[P4] Settings tab 'Shopify' visible solo si shopifyEnabled activo en workspace", done: true },
+      { label: "[P4] API /integrations/shopify/* retorna 503 con mensaje claro si flag desactivado", done: true },
+      { label: "[P4] ShopifyProductPicker: oculto si empresa sin Shopify conectado o flag desactivado", done: true },
+      { label: "[BUG FIX] workspace.aiApiKey se guardaba encriptado y los generate routes lo usaban sin decrypt() → Anthropic rechazaba con 401 y caía silenciosamente al mock stream", done: true },
+      { label: "[P5] Integrar Resend: email bienvenida al invitar miembro al workspace", done: false },
+      { label: "[P5] Email: asignación de pieza (notifica al asignado)", done: false },
+      { label: "[P5] Email: cambio de estado de pieza asignada", done: false },
+    ],
+  },
+
+  {
+    fase: "Fase 16 — Brief nativo en plataforma (reemplaza texto plano / Word)",
+    status: "pending" as const,
+    items: [
+      { label: "[DISEÑO] Definir JSON schema de secciones del brief: resumen, público, oferta, piezas, plan", done: false },
+      { label: "[DISEÑO] Flujo: wizard → Claude genera secciones JSON → persiste en Campaign.briefData", done: false },
+      { label: "[DB] Campo briefData Json? en Campaign (secciones parseadas del brief)", done: false },
+      { label: "[API] Cambiar promptMaestro para instruir a Claude a devolver JSON estructurado por secciones", done: false },
+      { label: "[API] Parser SSE: acumular → extraer JSON → guardar briefData al finalizar stream", done: false },
+      { label: "[UI] Vista brief en /campaigns/[id]: secciones con diseño nativo (no <pre> de texto)", done: false },
+      { label: "[UI] Sección 'Resumen ejecutivo': tabla con campaña, empresa, objetivo, presupuesto", done: false },
+      { label: "[UI] Sección 'Guiones y copys': acordeón por pieza con guión formateado + copy del ad", done: false },
+      { label: "[UI] Sección 'Plan de trabajo': tabla piezas con prioridad sugerida y timeline estimado", done: false },
+      { label: "[IA] Segundo call post-brief: genera plan de trabajo JSON (pieza → prioridad → fecha sugerida)", done: false },
+      { label: "[IA] Plan de trabajo actualiza dueDate y priority en Piece con confirmación del OWNER", done: false },
+      { label: "[UI] Modal preview del plan antes de aplicar: tabla editable → confirmar → guarda en DB", done: false },
+      { label: "[UI] Exportar brief a PDF desde browser (window.print + CSS print styles)", done: false },
+      { label: "[DB] BriefVersion: guardar versiones anteriores al regenerar brief", done: false },
+    ],
+  },
+
+  {
+    fase: "Fase 17 — Board Pro (inspirado en ClickUp, adaptado a producción creativa)",
+    status: "pending" as const,
+    items: [
+      // Board básico
+      { label: "[BOARD] Prioridad visible en PieceCard: badge URGENTE/ALTA/MEDIA/BAJA con colores", done: false },
+      { label: "[BOARD] Due date visible en PieceCard: badge con días restantes / vencida (rojo)", done: false },
+      { label: "[BOARD] Filtro por prioridad en BoardKanban (ya existe el campo en DB)", done: false },
+      { label: "[BOARD] Activity feed por pieza: historial de cambios de estado, asignaciones y comentarios en drawer", done: false },
+      // Assignees múltiples
+      { label: "[BOARD] Multiple assignees por pieza: campo assignees String[] en Piece + UI multi-select", done: false },
+      { label: "[BOARD] Assign comments: marcar comentario como acción pendiente → notifica al asignado", done: false },
+      // Workload view
+      { label: "[WORKLOAD] Vista 'Carga del equipo': piezas agrupadas por creativo asignado", done: false },
+      { label: "[WORKLOAD] Indicador de carga: conteo de piezas activas por miembro con semáforo visual", done: false },
+      { label: "[WORKLOAD] Filtro rápido 'mis piezas' vs 'todo el equipo' en board y workload", done: false },
+      // Timeline / Gantt ligero
+      { label: "[TIMELINE] Vista timeline de campaña: piezas en eje de tiempo por dueDate de publicación", done: false },
+      { label: "[TIMELINE] Drag-and-drop en timeline para mover fechas de piezas", done: false },
+      { label: "[TIMELINE] Indicador de hoy + rango de la campaña (fechaInicio → fechaFin)", done: false },
+      // Dashboard por campaña
+      { label: "[DASHBOARD] Widget 'Progreso de campaña': % piezas por estado (anillo/barra)", done: false },
+      { label: "[DASHBOARD] Widget 'IA generada': X/Y piezas con guión+copy generado", done: false },
+      { label: "[DASHBOARD] Widget 'Días al lanzamiento': countdown basado en fechaInicio de la campaña", done: false },
+      { label: "[DASHBOARD] Widget 'Carga del equipo': resumen de piezas asignadas por miembro", done: false },
+      // Goals / KPIs
+      { label: "[GOALS] KPIs por campaña: ROAS objetivo, CPA objetivo, presupuesto vs ejecutado", done: false },
+      { label: "[GOALS] Vincular KPIs a piezas PUBLICADO: el trafficker ingresa métricas reales de Meta", done: false },
+      { label: "[GOALS] Vista de rendimiento por campaña: KPI objetivo vs real con semáforo", done: false },
+      // Checklist y subpiezas
+      { label: "[PIEZA] Checklist interno por pieza: lista de verificación antes de marcar APROBADO", done: false },
+      { label: "[PIEZA] Templates de checklist por tipo de pieza (video UGC, carrusel, imagen estática)", done: false },
+      { label: "[PIEZA] Subpiezas: variantes de un mismo ad (ej. mismo guión, distintos formatos)", done: false },
+      // Piezas recurrentes
+      { label: "[PIEZA] Piezas recurrentes/evergreen: frecuencia (semanal/mensual) → se clonan automáticamente", done: false },
+      // Real-time colaboración
+      { label: "[REALTIME] Board en tiempo real: polling cada 30s o SSE para reflejar cambios de otros usuarios", done: false },
+      { label: "[REALTIME] Indicador 'X personas viendo' en board y en drawer de pieza", done: false },
+    ],
+  },
+
+  {
+    fase: "Fase 18 — Intake público (formulario de brief para clientes)",
+    status: "pending" as const,
+    items: [
+      { label: "[FORM] Formulario público /brief/[workspaceSlug]: cliente completa brief sin login", done: false },
+      { label: "[FORM] Campos del form: empresa, tipo campaña, objetivo, presupuesto, fecha, contacto", done: false },
+      { label: "[API] POST /api/public/brief → crea Campaign en DRAFT + notifica al OWNER por email", done: false },
+      { label: "[UI] Página de confirmación post-envío: 'Tu brief fue recibido, te contactamos en 24h'", done: false },
+      { label: "[UI] OWNER ve solicitudes de brief entrantes en panel: nuevo tab en /campaigns", done: false },
+      { label: "[UI] OWNER puede rechazar, aprobar o convertir el intake en campaña real con un click", done: false },
+      { label: "[BRANDING] Form con logo y colores del workspace — white-label por cliente", done: false },
+    ],
+  },
+
+  {
+    fase: "Fase 19 — Dashboard de métricas + Meta Ads por empresa",
+    status: "in-progress" as const,
+    items: [
+      // ── Meta por empresa (prerrequisito del dashboard) ──
+      { label: "[DB] Campos en Empresa: metaAdAccountId, metaAccessToken (AES-256-GCM), metaTokenExpiresAt, metaEnabled", done: true },
+      { label: "[API] POST /api/empresas/[id]/meta → guardar/actualizar token + probar conexión con Meta Graph API", done: true },
+      { label: "[API] DELETE /api/empresas/[id]/meta → desconectar Meta (limpia token en DB)", done: true },
+      { label: "[API] lib/meta-api.ts → cliente server-side con token por empresa (hit graph.facebook.com/v21.0)", done: true },
+      { label: "[UI] Sección 'Meta Ads' en /empresas/[id]: pegar token, probar conexión, ver nombre de cuenta, desconectar", done: true },
+      { label: "[UI] Badge 'Meta ✓' en card de empresa en /metrics cuando metaEnabled=true", done: true },
+      // ── Infraestructura dashboard ──
+      { label: "[RUTA] /metrics → página OWNER/SUPER_ADMIN con KPIs globales y cards por empresa", done: true },
+      { label: "[RUTA] /metrics/empresa/[id] → dashboard por empresa con tabs (Producción, Meta Ads, Audiencias)", done: true },
+      { label: "[NAV] Enlace 'Métricas' en sidebar (solo OWNER — ownerOnly flag)", done: true },
+      { label: "[UI] Selector de rango de fechas: 7d / 30d / 90d con refresh manual", done: true },
+      { label: "[UI] Loading states durante fetch de métricas", done: true },
+      // ── Tab Producción (siempre disponible, no requiere Meta) ──
+      { label: "[PROD] Cards KPIs: campañas activas, piezas totales, con IA, con retraso", done: true },
+      { label: "[PROD] Barra por estado de piezas con conteo y % visual", done: true },
+      { label: "[PROD] On-time rate: % piezas entregadas con alertas de retraso", done: true },
+      { label: "[PROD] Workload table: piezas activas por miembro del equipo con semáforo (Alta/Media/Baja)", done: true },
+      { label: "[PROD] Actividad reciente: últimos 10 cambios de estado con actor y timestamp", done: true },
+      { label: "[PROD] Piezas con dueDate esta semana: lista de próximas entregas y alertas de retraso", done: true },
+      // ── Tab Campañas Meta ──
+      { label: "[CAMP] Tabla campañas Meta: Spend, Impressions, Clicks, CTR, CPC, ROAS por campaña", done: true },
+      { label: "[CAMP] Badge ROAS: Top Performer (≥4x verde), Promedio (2-4x ámbar), Bajo rendimiento (<2x rojo)", done: true },
+      { label: "[CAMP] Account-level KPI cards: gasto total, impresiones, clicks, ROAS, CTR, CPC", done: true },
+      // ── Tab Audiencias ──
+      { label: "[AUDIENCE] Tabla age/gender: edad, género, gasto, impresiones, clicks", done: true },
+      { label: "[AUDIENCE] Barras de dispositivos: distribución % de impresiones por plataforma", done: true },
+      { label: "[AUDIENCE] Placement performance: Facebook Feed, Instagram Feed, Stories, Reels, Audience Network", done: true },
+      { label: "[AUDIENCE] Top 10 países: tabla con Spend, Impressions, Clicks, ROAS", done: true },
+      // ── Tab Creativos ──
+      { label: "[CREATIVE] Grid de piezas PUBLICADO: preview archivo S3, tipo, asignee, campaña", done: true },
+      { label: "[CREATIVE] Badge performance Meta: Top Performer (ROAS >4x), Promedio (2-4x), Bajo rendimiento (<2x)", done: false },
+      { label: "[CREATIVE] Métricas por creativo (si Meta conectado): Spend, Impressions, CTR, ROAS", done: false },
+      { label: "[CREATIVE] Filtros: por campaña, por performance tier, por tipo de pieza", done: false },
+      // ── Tab Analytics ──
+      { label: "[ANALYTICS] Gráfico dual-axis: Daily Spend vs ROAS (Recharts)", done: true },
+      { label: "[ANALYTICS] Gráfico barras ROAS por campaña con umbral de performance coloreado", done: true },
+      { label: "[ANALYTICS] Comparativa período actual vs período anterior para KPIs principales", done: false },
+      // ── Export ──
+      { label: "[EXPORT] Exportar métricas de campaña a CSV para reportes al cliente", done: true },
+    ],
+  },
+
+  {
+    fase: "Fase 20 — Chat de equipo (scope mínimo: por campaña)",
+    status: "pending" as const,
+    items: [
+      // Nota de diseño: chat contextual por campaña, no Slack completo
+      // Decisión: implementar solo si clientes lo piden explícitamente
+      // Schema
+      { label: "[DB] Modelo Channel: id, workspaceId, type (general | campaign), campaignId?, name", done: false },
+      { label: "[DB] Modelo ChatMessage: id, channelId, userId, content, createdAt (sin editar ni borrar en MVP)", done: false },
+      { label: "[DB] Canal #general creado automáticamente al crear workspace", done: false },
+      { label: "[DB] Canal por campaña creado al materializar piezas (completar wizard)", done: false },
+      // API
+      { label: "[API] GET /api/chat/[channelId]/messages → últimos 50 mensajes con paginación (cursor)", done: false },
+      { label: "[API] POST /api/chat/[channelId]/messages → crear mensaje (validación Zod, max 2000 chars)", done: false },
+      // UI
+      { label: "[UI] Sección 'Chat' en sidebar: lista de canales con badge de no leídos", done: false },
+      { label: "[UI] Vista de canal: burbujas de mensajes, avatar, timestamp relativo (hace X min)", done: false },
+      { label: "[UI] Input de mensaje: textarea con Cmd+Enter para enviar, bloqueo al enviar", done: false },
+      { label: "[UI] Scroll automático al último mensaje al abrir canal", done: false },
+      // Real-time
+      { label: "[REALTIME] Polling cada 10s para nuevos mensajes (sin Pusher/WebSocket en MVP)", done: false },
+      { label: "[REALTIME] Badge de no leídos en sidebar actualizado al marcar canal como visto", done: false },
+      // Menciones
+      { label: "[MENCIONES] @usuario en mensaje → notificación in-app al mencionado", done: false },
+      // Contextual links
+      { label: "[CONTEXTO] Comando /pieza [nombre] → inserta link clickeable a Piece con preview inline", done: false },
+    ],
+  },
 ]
 
 const STATUS_STYLE = {

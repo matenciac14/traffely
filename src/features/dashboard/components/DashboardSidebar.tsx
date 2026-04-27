@@ -5,15 +5,17 @@ import { usePathname } from "next/navigation"
 import {
   MegaphoneIcon, KanbanIcon, SettingsIcon,
   LayoutDashboardIcon, BuildingIcon, BrainCircuitIcon, MapIcon, BookOpenIcon,
+  BarChart2Icon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-type NavItem = { href: string; label: string; icon: React.ElementType; exact?: boolean }
+type NavItem = { href: string; label: string; icon: React.ElementType; exact?: boolean; ownerOnly?: boolean }
 
 const CLIENT_NAV: NavItem[] = [
   { href: "/empresas", label: "Empresas", icon: BuildingIcon },
   { href: "/campaigns", label: "Campañas", icon: MegaphoneIcon },
   { href: "/board", label: "Board", icon: KanbanIcon },
+  { href: "/metrics", label: "Métricas", icon: BarChart2Icon, ownerOnly: true },
   { href: "/settings", label: "Configuración", icon: SettingsIcon },
   { href: "/help", label: "Ayuda", icon: BookOpenIcon },
 ]
@@ -32,7 +34,9 @@ interface Props {
 export default function DashboardSidebar({ role }: Props) {
   const pathname = usePathname()
   const isSuperAdmin = role === "SUPER_ADMIN"
-  const nav = isSuperAdmin ? ADMIN_NAV : CLIENT_NAV
+  const isOwner = role === "OWNER"
+  const rawNav = isSuperAdmin ? ADMIN_NAV : CLIENT_NAV
+  const nav = rawNav.filter(item => !item.ownerOnly || isOwner)
 
   return (
     <aside className="w-56 flex-shrink-0 bg-sidebar flex flex-col border-r border-sidebar-border">

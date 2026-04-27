@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { db } from "@/lib/db/prisma"
 import { encrypt } from "@/lib/utils/crypto"
 import { validateShopifyHmac } from "@/lib/integrations/shopify/hmac"
-import { getAndDeleteState } from "../connect/route"
+import { getAndDeleteState } from "@/lib/integrations/shopify/state"
 import { logger } from "@/lib/logger"
 
 const APP_URL = process.env.NEXTAUTH_URL!
@@ -18,8 +18,8 @@ export async function GET(req: Request) {
     return NextResponse.redirect(`${APP_URL}/settings?shopify=error&reason=hmac`)
   }
 
-  // 2. Validar y consumir state
-  const entry = getAndDeleteState(state)
+  // 2. Validar y consumir state (Redis o fallback in-memory)
+  const entry = await getAndDeleteState(state)
   if (!entry || entry.shop !== shop) {
     return NextResponse.redirect(`${APP_URL}/settings?shopify=error&reason=state`)
   }
