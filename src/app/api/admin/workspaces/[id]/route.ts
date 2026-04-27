@@ -89,6 +89,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       })
     }
 
+    if (action === "shopify") {
+      const ws = await db.workspace.findUnique({ where: { id, isDeleted: false } })
+      if (!ws) return NextResponse.json({ error: "Not found" }, { status: 404 })
+      await db.workspace.update({ where: { id }, data: { shopifyEnabled: !ws.shopifyEnabled } })
+      await db.auditLog.create({
+        data: {
+          userId: adminId,
+          action: `workspace.shopify.${ws.shopifyEnabled ? "disable" : "enable"}`,
+          diff: { workspaceId: id } as object,
+        },
+      })
+    }
+
     if (action === "delete") {
       // Soft delete
       await db.workspace.update({

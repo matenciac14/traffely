@@ -2,10 +2,11 @@ import { notFound, redirect } from "next/navigation"
 import Link from "next/link"
 import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db/prisma"
-import { ArrowLeftIcon } from "lucide-react"
+import { ArrowLeftIcon, LayoutGridIcon, PencilIcon } from "lucide-react"
 import CampaignPromptActions from "./CampaignPromptActions"
 import CampaignGenerateSection from "./CampaignGenerateSection"
 import CampaignStatusBar from "./CampaignStatusBar"
+import CampaignActions from "./CampaignActions"
 import { cn } from "@/lib/utils"
 
 const STATUS_STYLE: Record<string, { label: string; class: string; dot: string }> = {
@@ -25,6 +26,13 @@ const TASK_STATUS_STYLE: Record<string, { label: string; color: string }> = {
   RECHAZADO:     { label: "Rechazado",     color: "bg-red-50 text-red-700" },
 }
 
+const PRIORITY_STYLE: Record<string, { label: string; color: string }> = {
+  BAJA:    { label: "Baja",    color: "text-muted-foreground" },
+  MEDIA:   { label: "Media",   color: "text-amber-600" },
+  ALTA:    { label: "Alta",    color: "text-orange-600" },
+  URGENTE: { label: "Urgente", color: "text-red-600" },
+}
+
 const STATUS_ORDER = ["DRAFT", "REVIEW", "APPROVED", "LIVE", "FINISHED"]
 
 export default async function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -39,7 +47,19 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         orderBy: { orden: "asc" },
         include: {
           pieces: {
-            select: { id: true, taskStatus: true, estado: true, modelo: true, tipoPieza: true, formato: true, assignee: { select: { name: true } } },
+            select: {
+              id: true,
+              taskStatus: true,
+              estado: true,
+              modelo: true,
+              tipoPieza: true,
+              formato: true,
+              priority: true,
+              dueDate: true,
+              guionGenerado: true,
+              copyGenerado: true,
+              assignee: { select: { id: true, name: true } },
+            },
             orderBy: { orden: "asc" },
           },
         },
@@ -74,6 +94,9 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
     ])
   )
 
+  // AI content stats
+  const piecesWithAI = allPieces.filter((p) => p.guionGenerado || p.copyGenerado).length
+
   // Status history from audit log
   const statusHistory = campaign.auditLogs
     .filter((l) => l.action === "campaign.status")
@@ -81,8 +104,6 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
       const diff = l.diff as { from: string; to: string } | null
       return { from: diff?.from, to: diff?.to, by: l.user.name, at: l.createdAt }
     })
-
-  const currentStepIdx = STATUS_ORDER.indexOf(campaign.status)
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-6">
@@ -93,11 +114,21 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         </Link>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-xl font-semibold text-foreground">{campaign.name}</h1>
+            <h1 className="text-xl font-semibold text-foreground flex-1">{campaign.name}</h1>
+            <CampaignActions campaignId={campaign.id} isArchived={campaign.isArchived} canManage={canManage} />
             <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-xs font-semibold", st.class)}>
               <span className={cn("w-1.5 h-1.5 rounded-full", st.dot)} />
               {st.label}
             </span>
+            {campaign.status === "DRAFT" && !campaign.promptMaestro && canManage && (
+              <Link
+                href={`/campaigns/new?resume=${campaign.id}`}
+                className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity"
+              >
+                <PencilIcon className="w-3 h-3" />
+                Continuar editando
+              </Link>
+            )}
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">
             {campaign.tipo === "EVERGREEN" ? "Evergreen" : "Estacional"}
@@ -138,11 +169,6 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
           </p>
         </div>
         <div className="bg-card rounded-2xl border border-border p-4">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ad Sets</p>
-          <p className="text-xl font-bold text-foreground mt-1">{campaign.adSets.length}</p>
-          <p className="text-[11px] text-muted-foreground">conjuntos de anuncios</p>
-        </div>
-        <div className="bg-card rounded-2xl border border-border p-4">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Piezas listas</p>
           <p className="text-xl font-bold text-foreground mt-1">{donePieces}<span className="text-sm font-normal text-muted-foreground">/{totalPieces}</span></p>
           <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-2">
@@ -152,30 +178,43 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             />
           </div>
         </div>
+        <div className="bg-card rounded-2xl border border-border p-4">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Con IA</p>
+          <p className="text-xl font-bold text-foreground mt-1">{piecesWithAI}<span className="text-sm font-normal text-muted-foreground">/{totalPieces}</span></p>
+          <p className="text-[11px] text-muted-foreground">guión/copy generado</p>
+        </div>
       </div>
 
-      {/* Piece status breakdown */}
-      {totalPieces > 0 && (
-        <div className="bg-card rounded-2xl border border-border p-5">
-          <h2 className="text-sm font-semibold text-foreground mb-4">Estado de piezas</h2>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(byStatus).filter(([, count]) => count > 0).map(([status, count]) => {
-              const s = TASK_STATUS_STYLE[status]
-              return (
-                <span key={status} className={cn("px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5", s.color)}>
-                  {s.label} <span className="font-bold">{count}</span>
-                </span>
-              )
-            })}
-          </div>
-        </div>
+      {/* Brief generado por IA — siempre visible si existe promptMaestro */}
+      {campaign.promptMaestro && (
+        <CampaignGenerateSection
+          campaignId={campaign.id}
+          campaignName={campaign.name}
+          initialBrief={campaign.briefGenerado}
+          generatedAt={campaign.briefGeneradoAt}
+        />
       )}
 
-      {/* Ad sets breakdown */}
+      {/* Tareas del equipo */}
       {campaign.adSets.length > 0 && (
         <div className="bg-card rounded-2xl border border-border overflow-hidden">
-          <div className="px-5 py-4 border-b border-border">
-            <h2 className="text-sm font-semibold text-foreground">Ad Sets</h2>
+          <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">Tareas del equipo</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {Object.entries(byStatus).filter(([, c]) => c > 0).map(([s, c]) => {
+                  const st = TASK_STATUS_STYLE[s]
+                  return `${c} ${st.label.toLowerCase()}`
+                }).join(" · ")}
+              </p>
+            </div>
+            <Link
+              href="/board"
+              className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-border text-xs font-medium text-foreground hover:bg-muted transition-colors"
+            >
+              <LayoutGridIcon className="w-3.5 h-3.5" />
+              Ver board
+            </Link>
           </div>
           <div className="divide-y divide-border">
             {campaign.adSets.map((adSet) => {
@@ -203,17 +242,58 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
                     </div>
                   </div>
                   {adSet.pieces.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="space-y-2">
                       {adSet.pieces.map((p) => {
                         const ts = TASK_STATUS_STYLE[p.taskStatus]
+                        const pri = p.priority ? PRIORITY_STYLE[p.priority] : null
+                        const hasAI = !!(p.guionGenerado || p.copyGenerado)
                         return (
-                          <span
+                          <div
                             key={p.id}
-                            className={cn("px-2 py-1 rounded-md text-[10px] font-medium border border-transparent", ts.color)}
-                            title={`${p.modelo ?? ""} · ${p.tipoPieza ?? ""}${p.assignee ? ` · ${p.assignee.name}` : ""}`}
+                            className="flex items-center gap-3 px-3 py-2 rounded-xl bg-muted/40 hover:bg-muted/70 transition-colors text-xs"
                           >
-                            {p.modelo ?? "?"} · {p.tipoPieza ?? "?"}
-                          </span>
+                            {/* Status badge */}
+                            <span className={cn("px-2 py-0.5 rounded-md font-semibold flex-shrink-0", ts.color)}>
+                              {ts.label}
+                            </span>
+
+                            {/* Piece name */}
+                            <span className="flex-1 min-w-0 font-medium text-foreground truncate">
+                              {p.modelo ?? "—"} · {p.tipoPieza ?? "—"}
+                              {p.formato && <span className="text-muted-foreground"> · {p.formato}</span>}
+                            </span>
+
+                            {/* AI indicator */}
+                            {hasAI && (
+                              <span className="text-primary flex-shrink-0" title="Guión/copy IA generado">✦</span>
+                            )}
+
+                            {/* Priority */}
+                            {pri && (
+                              <span className={cn("flex-shrink-0 font-semibold", pri.color)}>{pri.label}</span>
+                            )}
+
+                            {/* Due date */}
+                            {p.dueDate && (
+                              <span className="text-muted-foreground flex-shrink-0">
+                                {new Date(p.dueDate).toLocaleDateString("es-CO", { day: "2-digit", month: "short" })}
+                              </span>
+                            )}
+
+                            {/* Assignee */}
+                            {p.assignee ? (
+                              <span
+                                className="w-6 h-6 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center flex-shrink-0 uppercase"
+                                title={p.assignee.name}
+                              >
+                                {p.assignee.name.charAt(0)}
+                              </span>
+                            ) : (
+                              <span className="w-6 h-6 rounded-full bg-muted border border-dashed border-border flex items-center justify-center flex-shrink-0 text-muted-foreground">
+                                ?
+                              </span>
+                            )}
+                          </div>
                         )
                       })}
                     </div>
@@ -225,10 +305,10 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         </div>
       )}
 
-      {/* Brief */}
+      {/* Brief estratégico */}
       {brief && (
         <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
-          <h2 className="text-sm font-semibold text-foreground">Brief</h2>
+          <h2 className="text-sm font-semibold text-foreground">Brief estratégico</h2>
           <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
             {(
               [
@@ -247,11 +327,6 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             ))}
           </div>
         </div>
-      )}
-
-      {/* Generate with AI */}
-      {campaign.promptMaestro && (
-        <CampaignGenerateSection campaignId={campaign.id} campaignName={campaign.name} />
       )}
 
       {/* Status history */}
@@ -275,7 +350,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         </div>
       )}
 
-      {/* Prompt maestro */}
+      {/* Prompt maestro (colapsado al final) */}
       {campaign.promptMaestro && (
         <div className="bg-card rounded-2xl border border-border overflow-hidden">
           <div className="px-5 py-4 border-b border-border flex items-center justify-between">
@@ -287,7 +362,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
             </div>
             <CampaignPromptActions prompt={campaign.promptMaestro} name={campaign.name} />
           </div>
-          <pre className="p-5 text-xs text-foreground font-mono leading-relaxed overflow-auto max-h-[60vh] whitespace-pre-wrap break-words">
+          <pre className="p-5 text-xs text-foreground font-mono leading-relaxed overflow-auto max-h-[40vh] whitespace-pre-wrap break-words">
             {campaign.promptMaestro}
           </pre>
         </div>

@@ -4,7 +4,20 @@ import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useCampaignWizard } from "../../store/campaign-wizard"
 import { generarPromptMaestro } from "../../lib/prompt-generator"
-import { CopyIcon, CheckIcon, DownloadIcon, ArrowRightIcon } from "lucide-react"
+import { CopyIcon, CheckIcon, DownloadIcon, ArrowRightIcon, SparklesIcon } from "lucide-react"
+import type { CampaignWizardState } from "../../types"
+
+// Brief completeness check
+const BRIEF_FIELDS: { key: keyof CampaignWizardState; label: string }[] = [
+  { key: "contextoCampana", label: "Contexto" },
+  { key: "objetivoCampana", label: "Objetivo" },
+  { key: "publicoObjetivo", label: "Público" },
+  { key: "insightMensajeClave", label: "Insight" },
+  { key: "propuestasValor", label: "Propuestas de valor" },
+  { key: "tonoYestilo", label: "Tono y estilo" },
+  { key: "llamadaAccion", label: "CTA" },
+  { key: "queNOhacer", label: "Qué NO hacer" },
+]
 
 export default function StepPromptOutput({ onComplete, draftId }: { onComplete?: () => void; draftId?: string | null }) {
   const state = useCampaignWizard()
@@ -17,6 +30,12 @@ export default function StepPromptOutput({ onComplete, draftId }: { onComplete?:
   const savedRef = useRef(false)
 
   const prompt = generarPromptMaestro(state)
+
+  const stateAsRecord = state as unknown as Record<string, unknown>
+  const filledFields = BRIEF_FIELDS.filter(f => !!stateAsRecord[f.key])
+  const emptyFields = BRIEF_FIELDS.filter(f => !stateAsRecord[f.key])
+  const completeness = filledFields.length
+  const isComplete = completeness === BRIEF_FIELDS.length
 
   // Save to DB once on mount
   useEffect(() => {
@@ -73,9 +92,9 @@ export default function StepPromptOutput({ onComplete, draftId }: { onComplete?:
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold text-foreground">Prompt maestro generado</h2>
+          <h2 className="text-xl font-semibold text-foreground">Prompt maestro listo</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Copia este prompt y pégalo en Claude para generar el brief completo en Word.
+            Tu campaña está guardada. Desde la vista de campaña puedes generar el brief creativo completo con IA.
           </p>
         </div>
 
@@ -93,8 +112,49 @@ export default function StepPromptOutput({ onComplete, draftId }: { onComplete?:
         </div>
       </div>
 
+      {/* Brief completeness */}
+      <div className={`rounded-xl border p-4 space-y-3 ${isComplete ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <SparklesIcon className={`w-4 h-4 ${isComplete ? "text-emerald-600" : "text-amber-600"}`} />
+            <span className={`text-sm font-semibold ${isComplete ? "text-emerald-800" : "text-amber-800"}`}>
+              Completitud del brief: {completeness}/{BRIEF_FIELDS.length} campos
+            </span>
+          </div>
+          <div className="h-1.5 w-24 bg-white/60 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${isComplete ? "bg-emerald-500" : "bg-amber-500"}`}
+              style={{ width: `${(completeness / BRIEF_FIELDS.length) * 100}%` }}
+            />
+          </div>
+        </div>
+        {!isComplete && (
+          <div>
+            <p className={`text-xs ${isComplete ? "text-emerald-700" : "text-amber-700"}`}>
+              Mayor contexto = mejor output de IA. Campos vacíos:{" "}
+              <span className="font-medium">{emptyFields.map(f => f.label).join(", ")}</span>
+            </p>
+            <p className="text-xs text-amber-600 mt-1">
+              Puedes volver al paso 2 para completarlos antes de generar el brief con Claude.
+            </p>
+          </div>
+        )}
+        {isComplete && (
+          <p className="text-xs text-emerald-700">Brief completo — Claude tendrá todo el contexto para generar un brief de alta calidad.</p>
+        )}
+      </div>
+
       {/* Actions */}
       <div className="flex items-center gap-2 flex-wrap">
+        <button
+          onClick={handleGoToCampaign}
+          disabled={saving}
+          className="flex items-center gap-2 h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+        >
+          <SparklesIcon className="w-4 h-4" />
+          {saving ? "Guardando…" : "Ir a la campaña y generar brief"}
+          {!saving && <ArrowRightIcon className="w-4 h-4" />}
+        </button>
         <button
           onClick={handleCopy}
           className="flex items-center gap-2 h-9 px-4 rounded-lg border border-border bg-card text-sm font-medium text-foreground hover:bg-muted transition-colors"
@@ -107,15 +167,7 @@ export default function StepPromptOutput({ onComplete, draftId }: { onComplete?:
           className="flex items-center gap-2 h-9 px-4 rounded-lg border border-border bg-card text-sm font-medium text-foreground hover:bg-muted transition-colors"
         >
           <DownloadIcon className="w-4 h-4" />
-          Descargar .md
-        </button>
-        <button
-          onClick={handleGoToCampaign}
-          disabled={saving}
-          className="ml-auto flex items-center gap-2 h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          Ver campaña
-          <ArrowRightIcon className="w-4 h-4" />
+          .md
         </button>
         <div className="w-full text-xs text-muted-foreground">
           {prompt.length.toLocaleString("es-CO")} caracteres

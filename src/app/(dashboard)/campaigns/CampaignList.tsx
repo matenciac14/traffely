@@ -6,7 +6,7 @@ import Link from "next/link"
 import {
   SearchIcon, FilterIcon, MoreHorizontalIcon,
   CopyIcon, ArchiveIcon, ArchiveRestoreIcon,
-  ChevronRightIcon, XIcon,
+  ChevronRightIcon, XIcon, Trash2Icon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -107,6 +107,14 @@ function ActionsMenu({ campaign, canManage }: { campaign: Campaign; canManage: b
     if (data.id) router.push(`/campaigns/${data.id}`)
   }
 
+  async function handleDelete() {
+    if (!confirm("¿Eliminar esta campaña permanentemente? Esta acción no se puede deshacer.")) return
+    setLoading(true)
+    setOpen(false)
+    await fetch(`/api/campaigns/${campaign.id}`, { method: "DELETE" })
+    router.refresh()
+  }
+
   return (
     <div className="relative" onClick={(e) => e.stopPropagation()}>
       <button
@@ -151,6 +159,17 @@ function ActionsMenu({ campaign, canManage }: { campaign: Campaign; canManage: b
                   ? <><ArchiveRestoreIcon className="w-3.5 h-3.5 flex-shrink-0" /> Desarchivar</>
                   : <><ArchiveIcon className="w-3.5 h-3.5 flex-shrink-0" /> Archivar</>
                 }
+              </button>
+            )}
+
+            {/* Eliminar — solo OWNER/SUPER_ADMIN */}
+            {canManage && (
+              <button
+                onClick={handleDelete}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-destructive hover:bg-destructive/5 transition-colors text-left border-t border-border mt-1 pt-2"
+              >
+                <Trash2Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                Eliminar campaña
               </button>
             )}
           </div>

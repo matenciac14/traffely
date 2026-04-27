@@ -78,6 +78,7 @@ export interface CampaignWizardState {
 
   // Paso 1
   empresa: string
+  empresaId: string
 
   // Paso 2 · Brief
   tipoCampana: CampaignType | ""

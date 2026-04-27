@@ -2,12 +2,66 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useCampaignWizard } from "../store/campaign-wizard"
+import { EQUIPO_DEFAULT } from "../constants/campaign-data"
+import type { CampaignWizardState } from "../types"
 
-const LS_KEY = "traffely_wizard_draft"
-const LS_DRAFT_ID_KEY = "traffely_wizard_draft_id"
+const LS_KEY = (workspaceId: string) => `traffely_wizard_draft_${workspaceId}`
+const LS_DRAFT_ID_KEY = (workspaceId: string) => `traffely_wizard_draft_id_${workspaceId}`
 const AUTOSAVE_DELAY = 2000 // ms
 
-export function useWizardDraft() {
+// Reconstructs wizard state from the DB campaign JSON fields
+function campaignToWizardState(campaign: Record<string, unknown>): Partial<CampaignWizardState> {
+  const brief = campaign.brief as Record<string, string> | null
+  const oferta = campaign.oferta as Record<string, string> | null
+  const modelos = campaign.modelos as Record<string, unknown> | null
+  const estructura = campaign.estructura as Record<string, unknown> | null
+  const presupuesto = campaign.presupuesto as Record<string, unknown> | null
+
+  return {
+    currentStep: Math.min((campaign.currentStep as number) ?? 1, 7),
+    empresa: brief?.empresa ?? "",
+    nombreCampana: (campaign.name as string) ?? "",
+    tipoCampana: campaign.tipo === "EVERGREEN" ? "evergreen" : "estacional",
+    eventoEstacional: (campaign.eventoEstacional as string) ?? "",
+    // Brief (step 2)
+    contextoCampana: brief?.contextoCampana ?? "",
+    objetivoCampana: brief?.objetivoCampana ?? "",
+    publicoObjetivo: brief?.publicoObjetivo ?? "",
+    insightMensajeClave: brief?.insightMensajeClave ?? "",
+    propuestasValor: brief?.propuestasValor ?? "",
+    tonoYestilo: brief?.tonoYestilo ?? "",
+    llamadaAccion: brief?.llamadaAccion ?? "",
+    queNOhacer: brief?.queNOhacer ?? "",
+    // Oferta (step 3)
+    tipoOferta: (oferta?.tipoOferta ?? "") as CampaignWizardState["tipoOferta"],
+    otraOferta: oferta?.otraOferta ?? "",
+    contextoOferta: oferta?.contextoOferta ?? "",
+    ofertaMetodosPago: oferta?.metodosPago ?? "",
+    ofertaRegalo: oferta?.regalo ?? "",
+    ofertaGarantia: oferta?.garantia ?? "",
+    ofertaCambios: oferta?.cambios ?? "",
+    ofertaEnvio: oferta?.envio ?? "",
+    // Modelos (step 4)
+    modelosSeleccionados: (modelos?.seleccionados as string[]) ?? [],
+    modelosCustom: (modelos?.custom as string[]) ?? [],
+    preciosModelos: (modelos?.precios as CampaignWizardState["preciosModelos"]) ?? {},
+    modelosDescripcion: (modelos?.descripcion as CampaignWizardState["modelosDescripcion"]) ?? {},
+    // Estructura (step 5)
+    objetivo: (estructura?.objetivo as string) ?? "",
+    tipoPresupuesto: ((estructura?.tipoPresupuesto as string) ?? "ABO") as CampaignWizardState["tipoPresupuesto"],
+    campanas: (estructura?.campanas as CampaignWizardState["campanas"]) ?? [],
+    // Presupuesto (step 6)
+    presupuestoModo: ((presupuesto?.modo as string) ?? "mensual") as CampaignWizardState["presupuestoModo"],
+    presupuestoValor: (presupuesto?.valor as string) ?? "",
+    fechaInicio: (presupuesto?.fechaInicio as string) ?? "",
+    fechaFin: (presupuesto?.fechaFin as string) ?? "",
+    sinFechaFin: (presupuesto?.sinFechaFin as boolean) ?? false,
+    // Equipo (step 7)
+    equipo: (campaign.equipo as CampaignWizardState["equipo"]) ?? EQUIPO_DEFAULT,
+  }
+}
+
+export function useWizardDraft(resumeId?: string | null, workspaceId?: string | null) {
   const store = useCampaignWizard()
   const { loadFromJson } = store
   const [draftRestored, setDraftRestored] = useState(false)
@@ -16,20 +70,50 @@ export function useWizardDraft() {
   const dbDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const initialized = useRef(false)
 
-  // On mount: restore from localStorage, then create/link DB draft
+  // Keys scoped por workspace — evita que un usuario vea el borrador de otro
+  const lsKey = LS_KEY(workspaceId ?? "anon")
+  const lsDraftIdKey = LS_DRAFT_ID_KEY(workspaceId ?? "anon")
+
+  // On mount: if resumeId, load from DB. Otherwise restore from localStorage.
   useEffect(() => {
-    let restored = false
+    if (resumeId) {
+      // Resume an existing campaign — load from DB
+      fetch(`/api/campaigns/${resumeId}`)
+        .then(r => r.ok ? r.json() : null)
+        .then((data: Record<string, unknown> | null) => {
+          if (data) {
+            const wizardState = campaignToWizardState(data)
+            loadFromJson(wizardState)
+            setDraftId(resumeId)
+            localStorage.setItem(lsDraftIdKey, resumeId)
+            // Clear old localStorage draft to avoid conflicts
+            localStorage.removeItem(lsKey)
+            setDraftRestored(true)
+          }
+        })
+        .catch(() => {/* fallback to empty wizard */})
+        .finally(() => { initialized.current = true })
+      return
+    }
+
+    // Normal flow: restore from localStorage (solo si tenemos workspaceId)
+    if (!workspaceId) {
+      initialized.current = true
+      return
+    }
 
     try {
-      const raw = localStorage.getItem(LS_KEY)
-      const existingDraftId = localStorage.getItem(LS_DRAFT_ID_KEY)
+      const raw = localStorage.getItem(lsKey)
+      const existingDraftId = localStorage.getItem(lsDraftIdKey)
 
       if (raw) {
         const saved = JSON.parse(raw)
         if (saved.empresa || saved.nombreCampana) {
+          // Clamp currentStep to valid wizard range (1–7)
+          // A saved step > 7 means the wizard was already completed
+          if (saved.currentStep > 7) saved.currentStep = 1
           loadFromJson(saved)
           setDraftRestored(true)
-          restored = true
         }
       }
 
@@ -46,14 +130,14 @@ export function useWizardDraft() {
           .then(data => {
             if (data?.id) {
               setDraftId(data.id)
-              localStorage.setItem(LS_DRAFT_ID_KEY, data.id)
+              localStorage.setItem(lsDraftIdKey, data.id)
             }
           })
           .catch(() => {/* offline or auth issue */})
       }
     } catch {
-      localStorage.removeItem(LS_KEY)
-      localStorage.removeItem(LS_DRAFT_ID_KEY)
+      localStorage.removeItem(lsKey)
+      localStorage.removeItem(lsDraftIdKey)
     }
 
     initialized.current = true
@@ -63,7 +147,7 @@ export function useWizardDraft() {
   // Autosave to localStorage on every state change (debounced 2s)
   // Then also sync to DB every 5s
   useEffect(() => {
-    if (!initialized.current) return
+    if (!initialized.current || !workspaceId) return
 
     // localStorage save
     if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -72,14 +156,14 @@ export function useWizardDraft() {
         const snapshot = Object.fromEntries(
           Object.entries(store).filter(([, v]) => typeof v !== "function")
         )
-        localStorage.setItem(LS_KEY, JSON.stringify(snapshot))
+        localStorage.setItem(lsKey, JSON.stringify(snapshot))
       } catch { /* storage full */ }
     }, AUTOSAVE_DELAY)
 
     // DB sync (slower)
     if (dbDebounceRef.current) clearTimeout(dbDebounceRef.current)
     dbDebounceRef.current = setTimeout(() => {
-      const id = draftId || localStorage.getItem(LS_DRAFT_ID_KEY)
+      const id = draftId || localStorage.getItem(lsDraftIdKey)
       if (!id) return
       fetch(`/api/campaigns/${id}`, {
         method: "PATCH",
@@ -95,8 +179,8 @@ export function useWizardDraft() {
   })
 
   function clearDraft() {
-    localStorage.removeItem(LS_KEY)
-    localStorage.removeItem(LS_DRAFT_ID_KEY)
+    localStorage.removeItem(lsKey)
+    localStorage.removeItem(lsDraftIdKey)
     setDraftRestored(false)
     setDraftId(null)
   }

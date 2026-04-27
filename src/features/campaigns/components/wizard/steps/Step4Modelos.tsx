@@ -3,12 +3,36 @@
 import { useCampaignWizard } from "../../../store/campaign-wizard"
 import { MODELOS_BASE } from "../../../constants/campaign-data"
 import { cn } from "@/lib/utils"
+import ShopifyProductPicker from "../ShopifyProductPicker"
+import type { ShopifyProductSimple } from "@/lib/integrations/shopify/client"
 
 export default function Step4Modelos() {
   const {
     modelosSeleccionados, toggleModelo,
     preciosModelos, updatePrecio,
+    agregarModeloCustom,
   } = useCampaignWizard()
+
+  function handleShopifyVariants(product: ShopifyProductSimple) {
+    // Cada variante se importa como un modelo custom con sus precios
+    for (const variant of product.variants) {
+      const nombre = product.variants.length === 1
+        ? product.title
+        : `${product.title} — ${variant.title}`
+
+      if (!modelosSeleccionados.includes(nombre)) {
+        agregarModeloCustom(nombre)
+      }
+
+      // Actualizar precios si existen
+      if (variant.price) {
+        updatePrecio(nombre, "ahora", variant.price.replace(/[^0-9]/g, ""))
+      }
+      if (variant.compareAtPrice) {
+        updatePrecio(nombre, "antes", variant.compareAtPrice.replace(/[^0-9]/g, ""))
+      }
+    }
+  }
 
   return (
     <div className="space-y-8">
@@ -18,6 +42,13 @@ export default function Step4Modelos() {
           Selecciona los modelos que participan en esta campaña y asigna sus precios.
         </p>
       </div>
+
+      {/* Importar desde Shopify */}
+      <ShopifyProductPicker
+        mode="modelos"
+        onSelectProduct={() => {}}
+        onSelectVariantsAsModelos={handleShopifyVariants}
+      />
 
       <div className="space-y-2">
         {MODELOS_BASE.map((modelo) => {
