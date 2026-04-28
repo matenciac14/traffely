@@ -26,7 +26,13 @@ export async function DELETE(
   if (!piece) return NextResponse.json({ error: "Pieza no encontrada" }, { status: 404 })
   if (!piece.archivoKey) return NextResponse.json({ error: "Sin archivo" }, { status: 400 })
 
-  await deleteFile(piece.archivoKey)
+  try {
+    await deleteFile(piece.archivoKey)
+  } catch (err) {
+    console.error("[file/delete] S3 deleteFile error:", err)
+    return NextResponse.json({ error: "Error al eliminar el archivo de S3." }, { status: 500 })
+  }
+
   await db.piece.update({
     where: { id },
     data: { archivoUrl: null, archivoKey: null },

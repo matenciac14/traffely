@@ -51,7 +51,13 @@ export async function POST(
   const safeFilename = `${Date.now()}.${ext}`
   const key = buildKey(workspaceId, piece.adSet.campaign.id, piece.id, safeFilename)
 
-  const uploadUrl = await getUploadUrl(key, contentType)
+  let uploadUrl: string
+  try {
+    uploadUrl = await getUploadUrl(key, contentType)
+  } catch (err) {
+    console.error("[upload] S3 getUploadUrl error:", err)
+    return NextResponse.json({ error: "Error al generar URL de subida. Verifica la configuración de S3." }, { status: 500 })
+  }
 
   const archivoUrl = `https://${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`
 

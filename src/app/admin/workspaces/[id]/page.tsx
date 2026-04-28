@@ -3,6 +3,7 @@ import Link from "next/link"
 import { db } from "@/lib/db/prisma"
 import { ArrowLeftIcon } from "lucide-react"
 import WorkspaceActions from "./WorkspaceActions"
+import WorkspaceFeatureFlags from "./WorkspaceFeatureFlags"
 
 const ROLE_LABELS: Record<string, string> = {
   OWNER: "Propietario", CREATIVO: "Creativo", TRAFFICKER: "Trafficker", VIEWER: "Viewer",
@@ -60,7 +61,7 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
             <p className="text-sm text-muted-foreground mt-0.5">{[workspace.city, workspace.country].filter(Boolean).join(", ")}</p>
           )}
         </div>
-        <WorkspaceActions workspaceId={workspace.id} isActive={workspace.isActive} billingStatus={workspace.billingStatus} metaEnabled={workspace.metaEnabled} globalAiEnabled={workspace.globalAiEnabled} shopifyEnabled={workspace.shopifyEnabled} />
+        <WorkspaceActions workspaceId={workspace.id} isActive={workspace.isActive} billingStatus={workspace.billingStatus} />
       </div>
 
       {/* Stats */}
@@ -77,6 +78,14 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
           </div>
         ))}
       </div>
+
+      {/* Feature flags */}
+      <WorkspaceFeatureFlags
+        workspaceId={workspace.id}
+        metaEnabled={workspace.metaEnabled}
+        globalAiEnabled={workspace.globalAiEnabled}
+        shopifyEnabled={workspace.shopifyEnabled}
+      />
 
       {/* Notes */}
       {workspace.notes && (
