@@ -37,16 +37,20 @@ export default function AiKeyForm() {
   async function save() {
     if (!provider || !key.trim()) return
     setSaving(true)
-    await fetch("/api/workspace/ai-key", {
+    const res = await fetch("/api/workspace/ai-key", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ aiProvider: provider, aiApiKey: key.trim() }),
     })
+    setSaving(false)
+    if (!res.ok) {
+      alert("Error al guardar la API key. Intenta de nuevo.")
+      return
+    }
     setMaskedKey(`****${key.trim().slice(-4)}`)
     setHasKey(true)
     setKey("")
     setReplacing(false)
-    setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
   }

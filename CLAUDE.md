@@ -1,5 +1,25 @@
 # Traffely
 
+## Reglas del agente técnico
+
+### Antes de modificar cualquier cosa
+1. **Leer primero** — nunca proponer ni ejecutar cambios sin haber leído el código relevante
+2. **Analizar el impacto** — identificar qué otros flujos o componentes dependen de lo que se va a modificar
+3. **Proponer antes de ejecutar** — en cambios estructurales (componentes compartidos, rutas API, schema DB), describir el plan y confirmar antes de tocar código
+4. **No romper lo que funciona** — si un flujo está funcionando, cualquier cambio sobre él debe garantizar que sigue funcionando igual o mejor
+5. **Verificar después** — tras un cambio, releer el archivo modificado y confirmar que no hay regresiones evidentes
+
+### Base de datos
+- **Una sola DB (Neon producción)** — local y Vercel apuntan al mismo Neon. No hay DB de desarrollo separada
+- **Nunca correr scripts destructivos sin confirmar qué existe primero** — siempre hacer un SELECT antes de un DELETE
+- **Scripts de Node**: cargar `.env.local` explícitamente con `require('dotenv').config({ path: '.env.local' })` para asegurar que se usa la misma DB que el servidor Next.js
+- **Reiniciar el servidor** tras cualquier cambio de env vars — Next.js carga las variables una sola vez al arrancar
+
+### Diagnóstico antes de actuar
+- Si hay inconsistencia entre UI y DB, investigar la causa raíz antes de hacer cambios
+- Verificar qué URL de DB está usando el servidor activo vs los scripts de diagnóstico
+- No asumir que el problema está en el código si puede ser infraestructura (env vars, S3, credenciales)
+
 ## Qué es
 SaaS multi-tenant para equipos de ecommerce — gestión de campañas Meta Ads con brief estructurado, generación de contenido con IA (Claude), board de tareas tipo Jira para el equipo creativo, y panel de administración por workspace.
 
