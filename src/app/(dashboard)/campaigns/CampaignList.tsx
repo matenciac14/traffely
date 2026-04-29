@@ -9,6 +9,7 @@ import {
   ChevronRightIcon, XIcon, Trash2Icon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { clearWizardDraftIfMatches } from "@/features/campaigns/hooks/useWizardDraft"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -112,6 +113,7 @@ function ActionsMenu({ campaign, canManage }: { campaign: Campaign; canManage: b
     setLoading(true)
     setOpen(false)
     await fetch(`/api/campaigns/${campaign.id}`, { method: "DELETE" })
+    clearWizardDraftIfMatches(campaign.id)
     router.refresh()
   }
 

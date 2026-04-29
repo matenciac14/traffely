@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArchiveIcon, ArchiveRestoreIcon, Trash2Icon, MoreHorizontalIcon } from "lucide-react"
+import { clearWizardDraftIfMatches } from "@/features/campaigns/hooks/useWizardDraft"
 
 interface Props {
   campaignId: string
@@ -34,6 +35,7 @@ export default function CampaignActions({ campaignId, isArchived, canManage }: P
     setLoading(true)
     setOpen(false)
     await fetch(`/api/campaigns/${campaignId}`, { method: "DELETE" })
+    clearWizardDraftIfMatches(campaignId)
     router.push("/campaigns")
   }
 

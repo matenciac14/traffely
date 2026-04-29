@@ -9,6 +9,26 @@ const LS_KEY = (workspaceId: string) => `traffely_wizard_draft_${workspaceId}`
 const LS_DRAFT_ID_KEY = (workspaceId: string) => `traffely_wizard_draft_id_${workspaceId}`
 const AUTOSAVE_DELAY = 2000 // ms
 
+/**
+ * Elimina el borrador del wizard si apunta a la campaña eliminada.
+ * Se puede llamar desde cualquier componente sin necesitar workspaceId.
+ */
+export function clearWizardDraftIfMatches(campaignId: string) {
+  if (typeof window === "undefined") return
+  const toRemove: string[] = []
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i)
+    if (key?.startsWith("traffely_wizard_draft_id_")) {
+      if (localStorage.getItem(key) === campaignId) {
+        const suffix = key.replace("traffely_wizard_draft_id_", "")
+        toRemove.push(key)
+        toRemove.push(`traffely_wizard_draft_${suffix}`)
+      }
+    }
+  }
+  toRemove.forEach(k => localStorage.removeItem(k))
+}
+
 // Reconstructs wizard state from the DB campaign JSON fields
 function campaignToWizardState(campaign: Record<string, unknown>): Partial<CampaignWizardState> {
   const brief = campaign.brief as Record<string, string> | null
