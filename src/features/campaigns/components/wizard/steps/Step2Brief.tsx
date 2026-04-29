@@ -173,7 +173,7 @@ export default function Step2Brief() {
           type="text"
           value={nombreCampana}
           onChange={(e) => setField("nombreCampana", e.target.value)}
-          placeholder="Ej. Black Friday 2025 — NB 530"
+          placeholder="Ej. Black Friday 2025 — Producto estrella"
           className="w-full h-11 px-4 rounded-lg border border-input bg-card text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring text-sm"
         />
       </Field>
@@ -191,7 +191,7 @@ export default function Step2Brief() {
           <textarea
             value={contextoCampana}
             onChange={(e) => setField("contextoCampana", e.target.value)}
-            placeholder="¿Qué está pasando en el negocio? ¿Por qué esta campaña ahora? Ej. 'Lanzamiento de nueva línea running, necesitamos posicionarla contra Nike Free'"
+            placeholder="¿Qué está pasando en el negocio? ¿Por qué esta campaña ahora? Ej. 'Lanzamiento de nueva línea, queremos posicionarla y aumentar participación de mercado'"
             rows={2}
             className="w-full px-4 py-2.5 rounded-lg border border-input bg-card text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring text-sm resize-none"
           />
@@ -268,7 +268,7 @@ export default function Step2Brief() {
             type="text"
             value={insightMensajeClave}
             onChange={(e) => setField("insightMensajeClave", e.target.value)}
-            placeholder="Ej. 'El runner sabe que el equipo correcto marca la diferencia antes de salir'"
+            placeholder="Ej. 'El cliente sabe cuándo encontró exactamente lo que estaba buscando'"
             className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </Field>
@@ -277,7 +277,7 @@ export default function Step2Brief() {
           <textarea
             value={propuestasValor}
             onChange={(e) => setField("propuestasValor", e.target.value)}
-            placeholder="Ej. Autenticidad, comunidad runner, calidad premium sin marca premium, asesoría personalizada"
+            placeholder="Ej. Calidad premium, servicio personalizado, garantía, envío rápido, precio justo"
             rows={2}
             className="w-full px-4 py-2.5 rounded-lg border border-input bg-card text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring text-sm resize-none"
           />
@@ -312,7 +312,7 @@ export default function Step2Brief() {
             type="text"
             value={queNOhacer}
             onChange={(e) => setField("queNOhacer", e.target.value)}
-            placeholder="Ej. No mencionar precio antes de mostrar el producto, evitar 'barato', no comparar con Adidas"
+            placeholder="Ej. No mencionar precio antes de mostrar el producto, evitar 'barato', no nombrar competidores"
             className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </Field>

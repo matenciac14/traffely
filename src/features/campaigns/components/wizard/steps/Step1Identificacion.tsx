@@ -162,7 +162,7 @@ export default function Step1Identificacion() {
             type="text"
             value={empresa}
             onChange={(e) => { setEmpresa(e.target.value); setSelectedId("") }}
-            placeholder="Ej. Serrano Group"
+            placeholder="Ej. Mi Empresa"
             className="w-full h-10 px-3 rounded-lg border border-input bg-card text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring text-sm"
           />
         </div>
