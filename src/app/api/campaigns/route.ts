@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db/prisma"
 import { generarPromptMaestro } from "@/features/campaigns/lib/prompt-generator"
+import { logger } from "@/lib/logger"
 import type { CampaignWizardState } from "@/features/campaigns/types"
 
 export async function POST(req: Request) {
@@ -23,12 +24,14 @@ export async function POST(req: Request) {
         workspaceId: session.user.workspaceId,
         createdById: session.user.id,
         name: wizardState.nombreCampana || "Sin nombre",
+        empresaId: wizardState.empresaId || null,
         tipo: wizardState.tipoCampana === "evergreen" ? "EVERGREEN" : "ESTACIONAL",
         eventoEstacional: wizardState.eventoEstacional === "__custom__"
           ? wizardState.eventoCustom
           : wizardState.eventoEstacional || null,
         status: "DRAFT",
         brief: {
+          empresa: wizardState.empresa,
           contextoCampana: wizardState.contextoCampana,
           objetivoCampana: wizardState.objetivoCampana,
           publicoObjetivo: wizardState.publicoObjetivo,
@@ -112,7 +115,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ id: campaign.id })
   } catch (err) {
-    console.error("[POST /api/campaigns]", err)
+    logger.error("POST /api/campaigns", err)
     return NextResponse.json({ error: "Error interno" }, { status: 500 })
   }
 }
@@ -137,7 +140,7 @@ export async function PUT(req: Request) {
     })
     return NextResponse.json({ id: campaign.id })
   } catch (err) {
-    console.error("[PUT /api/campaigns]", err)
+    logger.error("PUT /api/campaigns", err)
     return NextResponse.json({ error: "Error interno" }, { status: 500 })
   }
 }

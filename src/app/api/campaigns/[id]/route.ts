@@ -28,6 +28,7 @@ export async function GET(
   const campaign = await db.campaign.findUnique({
     where: { id, workspaceId: session.user.workspaceId },
     include: {
+      empresa: { select: { id: true, nombre: true } },
       adSets: {
         orderBy: { orden: "asc" },
         include: {
@@ -138,6 +139,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           promptMaestro,
           promptVersion: "v1.0",
           brief: JSON.parse(JSON.stringify({
+            empresa: wizardState.empresa,
             contextoCampana: wizardState.contextoCampana,
             objetivoCampana: wizardState.objetivoCampana,
             publicoObjetivo: wizardState.publicoObjetivo,
@@ -293,6 +295,7 @@ export async function POST(
       data: {
         workspaceId: source.workspaceId,
         createdById: session.user.id!,
+        empresaId: source.empresaId ?? null,
         name: `${source.name} (copia)`,
         tipo: source.tipo,
         eventoEstacional: source.eventoEstacional,

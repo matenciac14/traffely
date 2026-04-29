@@ -16,10 +16,12 @@ function campaignToWizardState(campaign: Record<string, unknown>): Partial<Campa
   const modelos = campaign.modelos as Record<string, unknown> | null
   const estructura = campaign.estructura as Record<string, unknown> | null
   const presupuesto = campaign.presupuesto as Record<string, unknown> | null
+  const empresaRel = campaign.empresa as { id?: string; nombre?: string } | null
 
   return {
     currentStep: Math.min((campaign.currentStep as number) ?? 1, 7),
-    empresa: brief?.empresa ?? "",
+    empresa: empresaRel?.nombre ?? brief?.empresa ?? "",
+    empresaId: empresaRel?.id ?? (campaign.empresaId as string | null) ?? "",
     nombreCampana: (campaign.name as string) ?? "",
     tipoCampana: campaign.tipo === "EVERGREEN" ? "evergreen" : "estacional",
     eventoEstacional: (campaign.eventoEstacional as string) ?? "",
@@ -108,13 +110,23 @@ export function useWizardDraft(resumeId?: string | null, workspaceId?: string | 
 
       if (raw) {
         const saved = JSON.parse(raw)
-        if (saved.empresa || saved.nombreCampana) {
-          // Clamp currentStep to valid wizard range (1–7)
-          // A saved step > 7 means the wizard was already completed
-          if (saved.currentStep > 7) saved.currentStep = 1
+        const hasContent = saved.empresa || saved.nombreCampana
+        const wasCompleted = saved.currentStep > 7
+
+        if (hasContent && !wasCompleted) {
+          // Draft válido e incompleto — restaurar
           loadFromJson(saved)
           setDraftRestored(true)
+        } else {
+          // Draft vacío o de wizard ya completado — limpiar y empezar de cero
+          localStorage.removeItem(lsKey)
+          localStorage.removeItem(lsDraftIdKey)
+          store.reset()
         }
+      } else {
+        // Sin draft en localStorage — asegurarse de que el store esté limpio
+        // (puede tener datos de una sesión anterior por el store Zustand en memoria)
+        store.reset()
       }
 
       if (existingDraftId) {
