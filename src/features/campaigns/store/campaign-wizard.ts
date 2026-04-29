@@ -126,6 +126,7 @@ interface CampaignWizardActions {
   updatePrecio: (modelo: string, tipo: "antes" | "ahora", valor: string) => void
   updateModeloDesc: (modelo: string, valor: string) => void
   agregarModeloCustom: (nombre: string) => void
+  eliminarModeloCustom: (nombre: string) => void
 
   // Step 5 · Asistente
   setAutoMode: (mode: AutoMode) => void
@@ -261,6 +262,20 @@ export const useCampaignWizard = create<CampaignWizardState & CampaignWizardActi
           modelosSeleccionados: [...s.modelosSeleccionados, nombre],
           preciosModelos: { ...s.preciosModelos, [nombre]: { antes: "", ahora: "" } },
         })),
+
+      eliminarModeloCustom: (nombre) =>
+        set((s) => {
+          const precios = { ...s.preciosModelos }
+          const desc = { ...s.modelosDescripcion }
+          delete precios[nombre]
+          delete desc[nombre]
+          return {
+            modelosCustom: s.modelosCustom.filter((m) => m !== nombre),
+            modelosSeleccionados: s.modelosSeleccionados.filter((m) => m !== nombre),
+            preciosModelos: precios,
+            modelosDescripcion: desc,
+          }
+        }),
 
       // ── Step 5 · Asistente ──────────────────────────────────────────────────
 
@@ -433,7 +448,7 @@ export const useCampaignWizard = create<CampaignWizardState & CampaignWizardActi
 
       getAllModelos: () => {
         const s = get()
-        return [...MODELOS_BASE, ...s.modelosCustom]
+        return [...s.modelosCustom]
       },
 
       getTotalPiezas: () => {
