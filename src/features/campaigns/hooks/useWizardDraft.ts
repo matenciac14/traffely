@@ -9,17 +9,41 @@ const LS_KEY = (workspaceId: string) => `traffely_wizard_draft_${workspaceId}`
 const LS_DRAFT_ID_KEY = (workspaceId: string) => `traffely_wizard_draft_id_${workspaceId}`
 const AUTOSAVE_DELAY = 2000 // ms
 
+/**
+ * Elimina el borrador del wizard si apunta a la campaña eliminada.
+ * Se puede llamar desde cualquier componente sin necesitar workspaceId.
+ */
+export function clearWizardDraftIfMatches(campaignId: string) {
+  if (typeof window === "undefined") return
+  const toRemove: string[] = []
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i)
+    if (key?.startsWith("traffely_wizard_draft_id_")) {
+      if (localStorage.getItem(key) === campaignId) {
+        const suffix = key.replace("traffely_wizard_draft_id_", "")
+        toRemove.push(key)
+        toRemove.push(`traffely_wizard_draft_${suffix}`)
+      }
+    }
+  }
+  toRemove.forEach(k => localStorage.removeItem(k))
+}
+
 // Reconstructs wizard state from the DB campaign JSON fields
 function campaignToWizardState(campaign: Record<string, unknown>): Partial<CampaignWizardState> {
   const brief = campaign.brief as Record<string, string> | null
   const oferta = campaign.oferta as Record<string, string> | null
-  const modelos = campaign.modelos as Record<string, unknown> | null
+  const modelos = campaign.productos as Record<string, unknown> | null
   const estructura = campaign.estructura as Record<string, unknown> | null
   const presupuesto = campaign.presupuesto as Record<string, unknown> | null
   const empresaRel = campaign.empresa as { id?: string; nombre?: string } | null
+  const conceptosDb = campaign.conceptos as Array<{
+    nombre: string; hipotesis: string | null; anguloMensajeria: string | null;
+    frameworkCopy: string | null; direccionVisual: string | null; isSelected: boolean; orden: number;
+  }> | null
 
   return {
-    currentStep: Math.min((campaign.currentStep as number) ?? 1, 7),
+    currentStep: Math.min((campaign.currentStep as number) ?? 1, 6),
     empresa: empresaRel?.nombre ?? brief?.empresa ?? "",
     empresaId: empresaRel?.id ?? (campaign.empresaId as string | null) ?? "",
     nombreCampana: (campaign.name as string) ?? "",
@@ -43,11 +67,11 @@ function campaignToWizardState(campaign: Record<string, unknown>): Partial<Campa
     ofertaGarantia: oferta?.garantia ?? "",
     ofertaCambios: oferta?.cambios ?? "",
     ofertaEnvio: oferta?.envio ?? "",
-    // Modelos (step 4)
-    modelosSeleccionados: (modelos?.seleccionados as string[]) ?? [],
-    modelosCustom: (modelos?.custom as string[]) ?? [],
-    preciosModelos: (modelos?.precios as CampaignWizardState["preciosModelos"]) ?? {},
-    modelosDescripcion: (modelos?.descripcion as CampaignWizardState["modelosDescripcion"]) ?? {},
+    // Productos (step 4) — campo Prisma "productos" mapeado a columna DB "modelos" (@map)
+    productosSeleccionados: (modelos?.seleccionados as string[]) ?? [],
+    productosCustom: (modelos?.custom as string[]) ?? [],
+    preciosProductos: (modelos?.precios as CampaignWizardState["preciosProductos"]) ?? {},
+    productosDescripcion: (modelos?.descripcion as CampaignWizardState["productosDescripcion"]) ?? {},
     // Estructura (step 5)
     objetivo: (estructura?.objetivo as string) ?? "",
     tipoPresupuesto: ((estructura?.tipoPresupuesto as string) ?? "ABO") as CampaignWizardState["tipoPresupuesto"],
@@ -60,6 +84,18 @@ function campaignToWizardState(campaign: Record<string, unknown>): Partial<Campa
     sinFechaFin: (presupuesto?.sinFechaFin as boolean) ?? false,
     // Equipo (step 7)
     equipo: (campaign.equipo as CampaignWizardState["equipo"]) ?? EQUIPO_DEFAULT,
+    // Conceptos creativos (step 5) — restaurar desde DB con IDs sintéticos
+    conceptos: conceptosDb
+      ? conceptosDb.sort((a, b) => a.orden - b.orden).map((c) => ({
+          id: `C${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
+          nombre: c.nombre,
+          hipotesis: c.hipotesis ?? "",
+          anguloMensajeria: c.anguloMensajeria ?? "",
+          frameworkCopy: c.frameworkCopy ?? "",
+          direccionVisual: c.direccionVisual ?? "",
+          isSelected: c.isSelected,
+        }))
+      : [],
   }
 }
 
@@ -111,7 +147,7 @@ export function useWizardDraft(resumeId?: string | null, workspaceId?: string | 
       if (raw) {
         const saved = JSON.parse(raw)
         const hasContent = saved.empresa || saved.nombreCampana
-        const wasCompleted = saved.currentStep > 7
+        const wasCompleted = saved.currentStep > 6
 
         if (hasContent && !wasCompleted) {
           // Draft válido e incompleto — restaurar
@@ -158,6 +194,7 @@ export function useWizardDraft(resumeId?: string | null, workspaceId?: string | 
 
   // Autosave to localStorage on every state change (debounced 2s)
   // Then also sync to DB every 5s
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!initialized.current || !workspaceId) return
 

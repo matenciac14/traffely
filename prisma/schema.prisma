@@ -125,6 +125,7 @@ model Empresa {
   workspace  Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   identidad  EmpresaIdentidad?
   campaigns  Campaign[]
+  productos  Producto[]
 
   @@index([workspaceId])
   @@map("empresas")
@@ -141,6 +142,20 @@ model EmpresaIdentidad {
   instruccionesExtra String?
   colores            String?
   tipografias        String?
+
+  // Fase 21 — AI Architecture: contexto dinámico por empresa
+  contextoNegocio String? // cómo funciona el negocio, ciclo de compra, diferenciadores
+  reglasLegales   String? // prohibiciones y cuidados específicos de la industria
+  eventosKey      String? // fechas comerciales relevantes (Black Friday, temporada escolar, etc.)
+
+  // Fase 24 — contexto de negocio profundo para IA
+  industria       String? // descripción de industria para IA (ej: "Moda — calzado premium")
+  modeloNegocio   String? // B2C, B2B, marketplace, suscripción, etc.
+  ticketPromedio  String? // rango de precio promedio por venta (ej: "$80.000–$250.000 COP")
+  cicloVenta      String? // tiempo promedio desde interés hasta compra
+  temporadasClave String? // meses o eventos de mayor venta
+  equipoCreativo  String? // roles disponibles en el equipo interno
+  metaPrincipal   String? // objetivo principal de campañas: ventas, leads, awareness
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -187,8 +202,8 @@ model Campaign {
   brief      Json?
   // Paso 3: oferta
   oferta     Json?
-  // Paso 4: modelos seleccionados
-  modelos    Json?
+  // Paso 4: productos seleccionados
+  productos  Json? @map("modelos")
   // Paso 5: estructura Meta Ads (objetivo, ABO/CBO, modo)
   estructura Json?
   // Paso 6: presupuesto y fechas
@@ -215,6 +230,7 @@ model Campaign {
   auditLogs AuditLog[]
   versions  CampaignVersion[]
   comments  Comment[]
+  conceptos Concepto[]
 
   @@index([workspaceId])
   @@index([empresaId])
@@ -266,9 +282,10 @@ model Piece {
   carruselSlides Int?
 
   // Contenido generado por IA
-  guionGenerado String?
-  copyGenerado  String?
-  aiGeneratedAt DateTime?
+  guionGenerado      String?
+  copyGenerado       String?
+  imageBriefGenerado String?
+  aiGeneratedAt      DateTime?
 
   // Archivo subido (S3)
   archivoUrl    String?
@@ -294,6 +311,42 @@ model Piece {
   @@index([assigneeId])
   @@index([taskStatus])
   @@map("pieces")
+}
+
+model Producto {
+  id          String   @id @default(cuid())
+  empresaId   String
+  nombre      String
+  sku         String?
+  descripcion String?
+  precioActual Float?
+  precioAntes  Float?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@index([empresaId])
+  @@map("productos")
+}
+
+model Concepto {
+  id               String   @id @default(cuid())
+  campaignId       String
+  nombre           String
+  hipotesis        String?
+  anguloMensajeria String?
+  frameworkCopy    String?
+  direccionVisual  String?
+  isSelected       Boolean  @default(false)
+  orden            Int      @default(0)
+  createdAt        DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@map("conceptos")
 }
 
 model CampaignVersion {
@@ -375,6 +428,32 @@ model ShopifyIntegration {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@map("shopify_integrations")
+}
+
+model AiCore {
+  id           String   @id @default(cuid())
+  systemPrompt String   @db.Text
+  version      Int      @default(1)
+  isActive     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  versions AiCoreVersion[]
+
+  @@map("ai_core")
+}
+
+model AiCoreVersion {
+  id           String   @id @default(cuid())
+  aiCoreId     String
+  systemPrompt String   @db.Text
+  version      Int
+  createdAt    DateTime @default(now())
+
+  aiCore AiCore @relation(fields: [aiCoreId], references: [id], onDelete: Cascade)
+
+  @@index([aiCoreId])
+  @@map("ai_core_versions")
 }
 
 model Notification {

@@ -1,14 +1,32 @@
 "use client"
 
+import { AlertTriangleIcon } from "lucide-react"
 import { useCampaignWizard } from "../../../store/campaign-wizard"
 import { formatMoney, parseMoney } from "../../../lib/money"
+
+// Meta best practice: mínimo ~$15 USD por ad set/día para que el algoritmo optimice
+const MIN_POR_ADSET_DIARIO_COP = 60_000 // ~$15 USD
 
 export default function Step6Presupuesto() {
   const {
     presupuestoValor,
+    presupuestoModo,
     fechaInicio, fechaFin, sinFechaFin,
+    tipoPresupuesto,
+    campanas,
     setField,
   } = useCampaignWizard()
+
+  // Calcular advertencia de budget sufficiency
+  const totalAdSets = campanas.reduce((a, c) => a + c.conjuntos.length, 0)
+  const budget = parseInt(presupuestoValor || "0")
+  const budgetDiario = presupuestoModo === "mensual" ? Math.round(budget / 30) : budget
+  const budgetPorAdSet = totalAdSets > 0 ? Math.round(budgetDiario / totalAdSets) : 0
+  const budgetWarning =
+    totalAdSets > 0 &&
+    budget > 0 &&
+    tipoPresupuesto === "ABO" &&
+    budgetPorAdSet < MIN_POR_ADSET_DIARIO_COP
 
   return (
     <div className="space-y-8">
@@ -71,6 +89,21 @@ export default function Step6Presupuesto() {
           )}
         </div>
       </div>
+
+      {/* Budget sufficiency warning */}
+      {budgetWarning && (
+        <div className="flex items-start gap-2.5 p-3.5 rounded-xl border border-amber-200 bg-amber-50">
+          <AlertTriangleIcon className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <p className="text-xs font-semibold text-amber-800">Presupuesto bajo por conjunto (Meta best practice)</p>
+            <p className="text-xs text-amber-700">
+              Con {totalAdSets} ad set{totalAdSets !== 1 ? "s" : ""} en ABO, cada uno recibiría ~COP {formatMoney(String(budgetPorAdSet))}/día.
+              {" "}Meta recomienda mínimo COP {formatMoney(String(MIN_POR_ADSET_DIARIO_COP))}/día por ad set para salir de la fase de aprendizaje.
+              Considera aumentar el presupuesto o reducir la cantidad de conjuntos.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Summary */}
       {presupuestoValor && fechaInicio && (

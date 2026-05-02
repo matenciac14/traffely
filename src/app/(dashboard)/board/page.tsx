@@ -12,7 +12,10 @@ export default async function BoardPage() {
 
   const [pieces, members] = await Promise.all([
     db.piece.findMany({
-      where: { adSet: { campaign: { workspaceId: session.user.workspaceId } } },
+      where: {
+        adSet: { campaign: { workspaceId: session.user.workspaceId, isArchived: false } },
+        ...(role === "CREATIVO" ? { assigneeId: session.user.id! } : {}),
+      },
       select: {
         id: true,
         modelo: true,
@@ -20,6 +23,8 @@ export default async function BoardPage() {
         formato: true,
         taskStatus: true,
         estado: true,
+        priority: true,
+        dueDate: true,
         adSet: {
           select: {
             nombre: true,
@@ -37,12 +42,7 @@ export default async function BoardPage() {
     }),
   ])
 
-  // CREATIVO: solo sus piezas asignadas
-  const visiblePieces = role === "CREATIVO"
-    ? pieces.filter((p) => p.assignee?.id === session.user.id)
-    : pieces
-
-  if (visiblePieces.length === 0) {
+  if (pieces.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full py-32 text-center px-8">
         <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mb-4">
@@ -62,7 +62,7 @@ export default async function BoardPage() {
 
   return (
     <BoardKanban
-      pieces={visiblePieces}
+      pieces={pieces}
       members={members}
       currentUserId={session.user.id!}
       currentUserRole={role}

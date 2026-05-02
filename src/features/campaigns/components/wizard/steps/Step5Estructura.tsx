@@ -15,7 +15,7 @@ import { PlusIcon, TrashIcon, ChevronDownIcon, ChevronUpIcon, AlertCircleIcon } 
 
 function getMissingFields(p: Piece): string[] {
   const missing: string[] = []
-  if (!p.modelo) missing.push("modelo")
+  if (!p.producto) missing.push("producto")
   if (!p.tipoPieza) missing.push("tipoPieza")
   if (!p.trafico) missing.push("trafico")
   if (!p.angulo) missing.push("angulo")
@@ -30,7 +30,7 @@ function getMissingFields(p: Piece): string[] {
 }
 
 const FIELD_LABELS: Record<string, string> = {
-  modelo: "Modelo",
+  producto: "Producto",
   tipoPieza: "Tipo de pieza",
   trafico: "Tráfico",
   angulo: "Ángulo",
@@ -45,14 +45,14 @@ const FIELD_LABELS: Record<string, string> = {
 // ── Piece editor ────────────────────────────────────────────────────────────
 
 function PiezaEditor({ ci, cji, pi, showErrors }: { ci: number; cji: number; pi: number; showErrors: boolean }) {
-  const { campanas, updatePiezaField, modelosSeleccionados, modelosCustom } = useCampaignWizard()
+  const { campanas, updatePiezaField, productosSeleccionados, productosCustom } = useCampaignWizard()
   const pieza = campanas[ci]?.conjuntos[cji]?.piezas[pi]
   if (!pieza) return null
 
   const esVideo = pieza.tipoPieza?.toLowerCase().includes("video")
   const missing = showErrors ? getMissingFields(pieza) : []
 
-  const allModelos = [...modelosSeleccionados, ...modelosCustom]
+  const allProductos = [...new Set([...productosSeleccionados, ...productosCustom])]
 
   function setCustom(field: string, val: string) {
     updatePiezaField(ci, cji, pi, "_customs", { ...pieza._customs, [field]: val })
@@ -62,7 +62,8 @@ function PiezaEditor({ ci, cji, pi, showErrors }: { ci: number; cji: number; pi:
     label: string,
     fieldKey: keyof typeof pieza,
     options: readonly string[] | readonly { nombre: string; icon?: string; desc?: string }[],
-    hasCustom?: string
+    hasCustom?: string,
+    hint?: string
   ) {
     type Item = { label: string; val: string; icon?: string; desc?: string }
     const isObjArr = options.length > 0 && typeof options[0] === "object"
@@ -73,6 +74,8 @@ function PiezaEditor({ ci, cji, pi, showErrors }: { ci: number; cji: number; pi:
     const current = pieza[fieldKey] as string
     const customVal = hasCustom ? (pieza._customs?.[hasCustom] ?? "") : ""
     const isMissing = missing.includes(fieldKey as string)
+    // Show desc of currently selected item (if any)
+    const selectedDesc = items.find((i) => i.val === current)?.desc
 
     return (
       <div className="space-y-1.5">
@@ -82,7 +85,13 @@ function PiezaEditor({ ci, cji, pi, showErrors }: { ci: number; cji: number; pi:
             isMissing ? "text-destructive" : "text-muted-foreground"
           )}>{label}</p>
           {isMissing && <AlertCircleIcon className="w-3 h-3 text-destructive" />}
+          {hint && !isMissing && (
+            <span className="text-[10px] text-muted-foreground/70 normal-case tracking-normal font-normal">— {hint}</span>
+          )}
         </div>
+        {selectedDesc && (
+          <p className="text-[11px] text-primary/70 -mt-0.5">{selectedDesc}</p>
+        )}
         <div className={cn("flex flex-wrap gap-1.5 p-2 rounded-lg transition-colors", isMissing && "bg-destructive/5 border border-destructive/20")}>
           {items.map((item) => (
             <button
@@ -157,22 +166,22 @@ function PiezaEditor({ ci, cji, pi, showErrors }: { ci: number; cji: number; pi:
       </div>
 
       {/* Modelo — primer campo, usa los modelos del Paso 4 */}
-      {allModelos.length > 0 && (() => {
-        const isMissing = missing.includes("modelo")
+      {allProductos.length > 0 && (() => {
+        const isMissing = missing.includes("producto")
         return (
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5">
-              <p className={cn("text-xs font-semibold uppercase tracking-wide", isMissing ? "text-destructive" : "text-muted-foreground")}>Modelo</p>
+              <p className={cn("text-xs font-semibold uppercase tracking-wide", isMissing ? "text-destructive" : "text-muted-foreground")}>Producto</p>
               {isMissing && <AlertCircleIcon className="w-3 h-3 text-destructive" />}
             </div>
             <div className={cn("flex flex-wrap gap-1.5 p-2 rounded-lg transition-colors", isMissing && "bg-destructive/5 border border-destructive/20")}>
-              {allModelos.map((m) => (
+              {allProductos.map((m) => (
                 <button
                   key={m}
-                  onClick={() => updatePiezaField(ci, cji, pi, "modelo", m)}
+                  onClick={() => updatePiezaField(ci, cji, pi, "producto", m)}
                   className={cn(
                     "px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all",
-                    pieza.modelo === m
+                    pieza.producto === m
                       ? "border-primary bg-accent text-accent-foreground"
                       : "border-border bg-card text-foreground hover:border-primary/40"
                   )}
@@ -186,12 +195,12 @@ function PiezaEditor({ ci, cji, pi, showErrors }: { ci: number; cji: number; pi:
       })()}
 
       {fieldChips("Tipo de pieza", "tipoPieza", TIPOS_PIEZA, "tipoPieza")}
-      {fieldChips("Tráfico", "trafico", TIPOS_TRAFICO)}
-      {fieldChips("Ángulo", "angulo", ANGULOS_BASE, "angulo")}
-      {fieldChips("Conciencia", "conciencia", NIVELES_CONCIENCIA)}
-      {fieldChips("Motivo", "motivo", MOTIVOS)}
-      {fieldChips("Narrativa", "narrativa", NARRATIVAS_BASE, "narrativa")}
-      {fieldChips("Estructura copy", "estructuraCopy", ESTRUCTURAS_COPY.map((e) => e.nombre))}
+      {fieldChips("Tráfico", "trafico", TIPOS_TRAFICO, undefined, "temperatura de compra del público")}
+      {fieldChips("Ángulo", "angulo", ANGULOS_BASE, "angulo", "enfoque del mensaje")}
+      {fieldChips("Conciencia", "conciencia", NIVELES_CONCIENCIA, undefined, "cuánto sabe el usuario del producto")}
+      {fieldChips("Motivo", "motivo", MOTIVOS, undefined, "eje psicológico de persuasión")}
+      {fieldChips("Narrativa", "narrativa", NARRATIVAS_BASE, "narrativa", "estructura del relato")}
+      {fieldChips("Estructura copy", "estructuraCopy", ESTRUCTURAS_COPY.map((e) => ({ nombre: e.nombre, icon: e.icon, desc: e.desc })), undefined, "framework de escritura")}
       {fieldChips("Formato", "formato", FORMATOS)}
 
       {esVideo && (

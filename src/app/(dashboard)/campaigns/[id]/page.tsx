@@ -7,6 +7,8 @@ import CampaignPromptActions from "./CampaignPromptActions"
 import CampaignGenerateSection from "./CampaignGenerateSection"
 import CampaignStatusBar from "./CampaignStatusBar"
 import CampaignActions from "./CampaignActions"
+import CampaignWorkPlan from "./CampaignWorkPlan"
+import CampaignTeamAssign from "./CampaignTeamAssign"
 import { cn } from "@/lib/utils"
 
 const STATUS_STYLE: Record<string, { label: string; class: string; dot: string }> = {
@@ -83,6 +85,16 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
   const presupuesto = campaign.presupuesto as Record<string, any> | null
 
   const allPieces = campaign.adSets.flatMap((a) => a.pieces)
+  const flatPiecesForAssign = campaign.adSets.flatMap((as) =>
+    as.pieces.map((p) => ({
+      id: p.id,
+      modelo: p.modelo,
+      tipoPieza: p.tipoPieza,
+      adSetNombre: as.nombre,
+      assigneeId: p.assignee?.id ?? null,
+      assigneeName: p.assignee?.name ?? null,
+    }))
+  )
   const totalPieces = allPieces.length
   const donePieces = allPieces.filter((p) => ["APROBADO", "PUBLICADO"].includes(p.taskStatus)).length
   const pct = totalPieces > 0 ? Math.round((donePieces / totalPieces) * 100) : 0
@@ -193,6 +205,20 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
           initialBrief={campaign.briefGenerado}
           generatedAt={campaign.briefGeneradoAt}
         />
+      )}
+
+      {/* Plan de trabajo IA */}
+      {canManage && (
+        <CampaignWorkPlan
+          campaignId={campaign.id}
+          briefGenerated={!!campaign.briefGenerado}
+          piecesCount={totalPieces}
+        />
+      )}
+
+      {/* Asignación de equipo */}
+      {canManage && totalPieces > 0 && (
+        <CampaignTeamAssign pieces={flatPiecesForAssign} />
       )}
 
       {/* Tareas del equipo */}

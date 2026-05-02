@@ -16,10 +16,16 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
-    fetch("/api/notifications")
-      .then((r) => r.ok ? r.json() : [])
-      .then(setNotifications)
-      .catch(() => {})
+    function poll() {
+      fetch("/api/notifications")
+        .then((r) => r.ok ? r.json() : [])
+        .then(setNotifications)
+        .catch(() => {})
+    }
+
+    poll()
+    const interval = setInterval(poll, 10_000)
+    return () => clearInterval(interval)
   }, [])
 
   async function markAllRead() {

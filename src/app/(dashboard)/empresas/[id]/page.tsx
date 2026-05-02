@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import {
   ArrowLeftIcon, BuildingIcon, PencilIcon, CheckIcon, XIcon,
-  MegaphoneIcon, GlobeIcon, Trash2Icon, BrainCircuitIcon,
+  MegaphoneIcon, GlobeIcon, Trash2Icon, BrainCircuitIcon, PackageIcon, PlusIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import MetaConnectionCard from "./MetaConnectionCard"
@@ -28,6 +28,15 @@ interface EmpresaIdentidad {
   tono: string | null; publicoObjetivo: string | null; propuestasValor: string | null
   palabrasProhibidas: string | null; instruccionesExtra: string | null
   colores: string | null; tipografias: string | null
+  contextoNegocio: string | null; reglasLegales: string | null; eventosKey: string | null
+  industria: string | null; modeloNegocio: string | null; ticketPromedio: string | null
+  cicloVenta: string | null; temporadasClave: string | null; equipoCreativo: string | null
+  metaPrincipal: string | null
+}
+
+interface Producto {
+  id: string; nombre: string; sku: string | null; descripcion: string | null
+  precioActual: number | null; precioAntes: number | null; isActive: boolean
 }
 
 interface EmpresaData {
@@ -102,6 +111,9 @@ export default function EmpresaDetailPage() {
   const router = useRouter()
   const [empresa, setEmpresa] = useState<EmpresaData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [productos, setProductos] = useState<Producto[]>([])
+  const [nuevoProducto, setNuevoProducto] = useState("")
+  const [addingProducto, setAddingProducto] = useState(false)
 
   const loadEmpresa = useCallback(async () => {
     const res = await fetch(`/api/empresas/${id}`)
@@ -110,6 +122,34 @@ export default function EmpresaDetailPage() {
   }, [id])
 
   useEffect(() => { loadEmpresa() }, [loadEmpresa])
+
+  const loadProductos = useCallback(async () => {
+    const res = await fetch(`/api/empresas/${id}/productos`)
+    if (res.ok) {
+      const d = await res.json()
+      setProductos(d.productos ?? [])
+    }
+  }, [id])
+
+  useEffect(() => { loadProductos() }, [loadProductos])
+
+  async function handleAddProducto() {
+    if (!nuevoProducto.trim()) return
+    setAddingProducto(true)
+    await fetch(`/api/empresas/${id}/productos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nombre: nuevoProducto.trim() }),
+    })
+    setNuevoProducto("")
+    setAddingProducto(false)
+    await loadProductos()
+  }
+
+  async function handleDeleteProducto(productoId: string) {
+    await fetch(`/api/empresas/${id}/productos/${productoId}`, { method: "DELETE" })
+    await loadProductos()
+  }
 
   async function patchEmpresa(data: object) {
     await fetch(`/api/empresas/${id}`, {
@@ -136,8 +176,11 @@ export default function EmpresaDetailPage() {
 
   const id5 = empresa.identidad
   const identidadPct = Math.round(
-    [id5?.tono, id5?.publicoObjetivo, id5?.propuestasValor, id5?.palabrasProhibidas, id5?.instruccionesExtra]
-      .filter(Boolean).length / 5 * 100
+    [id5?.tono, id5?.publicoObjetivo, id5?.propuestasValor, id5?.palabrasProhibidas,
+     id5?.instruccionesExtra, id5?.contextoNegocio, id5?.reglasLegales, id5?.eventosKey,
+     id5?.industria, id5?.modeloNegocio, id5?.ticketPromedio, id5?.cicloVenta,
+     id5?.temporadasClave, id5?.equipoCreativo, id5?.metaPrincipal]
+      .filter(Boolean).length / 15 * 100
   )
 
   return (
@@ -227,6 +270,54 @@ export default function EmpresaDetailPage() {
 
           <EditableField label="Instrucciones extra para la IA" value={id5?.instruccionesExtra ?? ""} placeholder="Sin instrucciones adicionales"
             multiline onSave={(v) => patchIdentidad({ instruccionesExtra: v })} />
+
+          <div className="border-t border-border pt-4 space-y-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Contexto avanzado</p>
+
+            <EditableField label="Contexto del negocio" value={id5?.contextoNegocio ?? ""}
+              placeholder="Cómo funciona el negocio, ciclo de compra, canal de ventas, diferenciadores clave…"
+              multiline onSave={(v) => patchIdentidad({ contextoNegocio: v })} />
+
+            <EditableField label="Reglas legales y restricciones" value={id5?.reglasLegales ?? ""}
+              placeholder="Palabras o afirmaciones prohibidas por regulación, cuidados de la industria…"
+              multiline onSave={(v) => patchIdentidad({ reglasLegales: v })} />
+
+            <EditableField label="Eventos clave del año" value={id5?.eventosKey ?? ""}
+              placeholder="Black Friday, temporada escolar, primas junio/diciembre, lanzamiento de producto…"
+              multiline onSave={(v) => patchIdentidad({ eventosKey: v })} />
+          </div>
+
+          <div className="border-t border-border pt-4 space-y-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Contexto de negocio</p>
+
+            <EditableField label="Industria (para IA)" value={id5?.industria ?? ""}
+              placeholder="Moda — calzado premium colombiano, Belleza — cosméticos naturales para mujeres…"
+              onSave={(v) => patchIdentidad({ industria: v })} />
+
+            <EditableField label="Modelo de negocio" value={id5?.modeloNegocio ?? ""}
+              placeholder="B2C ecommerce propio, B2B con distribuidores, marketplace, suscripción…"
+              onSave={(v) => patchIdentidad({ modeloNegocio: v })} />
+
+            <EditableField label="Ticket promedio" value={id5?.ticketPromedio ?? ""}
+              placeholder="$80.000–$250.000 COP, $30–$80 USD, varía por temporada…"
+              onSave={(v) => patchIdentidad({ ticketPromedio: v })} />
+
+            <EditableField label="Ciclo de venta" value={id5?.cicloVenta ?? ""}
+              placeholder="Inmediato (impulso), 1–3 días (investigación), 1–2 semanas (comparación)…"
+              onSave={(v) => patchIdentidad({ cicloVenta: v })} />
+
+            <EditableField label="Temporadas clave" value={id5?.temporadasClave ?? ""}
+              placeholder="Diciembre y junio (primas), día de la madre, temporada escolar enero…"
+              multiline onSave={(v) => patchIdentidad({ temporadasClave: v })} />
+
+            <EditableField label="Equipo creativo disponible" value={id5?.equipoCreativo ?? ""}
+              placeholder="2 creativos UGC, 1 editor video, sin equipo propio (subcontratan)…"
+              onSave={(v) => patchIdentidad({ equipoCreativo: v })} />
+
+            <EditableField label="Meta principal de campañas" value={id5?.metaPrincipal ?? ""}
+              placeholder="Ventas directas, generación de leads, awareness de marca, tráfico a tienda…"
+              onSave={(v) => patchIdentidad({ metaPrincipal: v })} />
+          </div>
         </div>
       </div>
 
@@ -237,6 +328,72 @@ export default function EmpresaDetailPage() {
         initialAccountName={null}
         initialAdAccountId={empresa.metaAdAccountId}
       />
+
+      {/* ── Catálogo de productos ────────────────────────────────────── */}
+      <div className="bg-card border border-border rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <PackageIcon className="w-4 h-4 text-muted-foreground" /> Catálogo de productos
+          </h2>
+          <span className="text-xs text-muted-foreground">{productos.length} producto{productos.length !== 1 ? "s" : ""}</span>
+        </div>
+
+        <div className="flex gap-2 mb-4">
+          <input
+            type="text"
+            value={nuevoProducto}
+            onChange={(e) => setNuevoProducto(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAddProducto()}
+            placeholder="Nombre del producto…"
+            className="flex-1 h-8 px-3 text-sm rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          <button
+            onClick={handleAddProducto}
+            disabled={!nuevoProducto.trim() || addingProducto}
+            className="h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-medium flex items-center gap-1.5 hover:opacity-90 transition-opacity disabled:opacity-40"
+          >
+            <PlusIcon className="w-3.5 h-3.5" />
+            Agregar
+          </button>
+        </div>
+
+        {productos.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            Sin productos en el catálogo. Los productos aquí estarán disponibles en el wizard de campañas.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {productos.map((p) => (
+              <div key={p.id} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border bg-background">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{p.nombre}</p>
+                  {p.sku && <p className="text-xs text-muted-foreground">SKU: {p.sku}</p>}
+                </div>
+                {(p.precioActual || p.precioAntes) && (
+                  <div className="text-right flex-shrink-0">
+                    {p.precioAntes && (
+                      <p className="text-xs text-muted-foreground line-through">
+                        ${p.precioAntes.toLocaleString("es-CO")}
+                      </p>
+                    )}
+                    {p.precioActual && (
+                      <p className="text-xs font-semibold text-foreground">
+                        ${p.precioActual.toLocaleString("es-CO")}
+                      </p>
+                    )}
+                  </div>
+                )}
+                <button
+                  onClick={() => handleDeleteProducto(p.id)}
+                  className="w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors flex-shrink-0"
+                >
+                  <XIcon className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* ── Campañas recientes ───────────────────────────────────────── */}
       {empresa.campaigns.length > 0 && (

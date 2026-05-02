@@ -11,6 +11,8 @@ export function getAiClient(workspaceApiKey?: string | null): Anthropic {
 }
 
 export const AI_MODEL = "claude-opus-4-6"
+/** Modelo más económico para operaciones secundarias (conceptos, work-plan, generación por pieza) */
+export const AI_MODEL_FAST = "claude-sonnet-4-6"
 
 export const SYSTEM_PROMPT = `Eres un copywriter senior y director creativo especializado en publicidad digital para el mercado latinoamericano.
 Tu expertise es en campañas de Meta Ads (Facebook e Instagram) para marcas de ecommerce y retail en LatAm.

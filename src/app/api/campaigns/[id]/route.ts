@@ -37,8 +37,13 @@ export async function GET(
           },
         },
       },
+      conceptos: {
+        orderBy: { orden: "asc" },
+        select: { nombre: true, hipotesis: true, anguloMensajeria: true, frameworkCopy: true, direccionVisual: true, isSelected: true, orden: true },
+      },
       auditLogs: {
         orderBy: { createdAt: "asc" },
+        take: 50,
         select: { action: true, diff: true, createdAt: true, user: { select: { name: true } } },
       },
       createdBy: { select: { id: true, name: true } },
@@ -77,7 +82,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           eventoEstacional: wizardState.eventoEstacional === "__custom__"
             ? wizardState.eventoCustom
             : wizardState.eventoEstacional || null,
-          currentStep: wizardState.currentStep,
+          currentStep: Math.min(wizardState.currentStep, 7),
           brief: JSON.parse(JSON.stringify({
             empresa: wizardState.empresa,
             contextoCampana: wizardState.contextoCampana,
@@ -99,11 +104,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             cambios: wizardState.ofertaCambios,
             envio: wizardState.ofertaEnvio,
           })) : undefined,
-          modelos: wizardState.modelosSeleccionados.length ? JSON.parse(JSON.stringify({
-            seleccionados: wizardState.modelosSeleccionados,
-            custom: wizardState.modelosCustom,
-            precios: wizardState.preciosModelos,
-            descripcion: wizardState.modelosDescripcion,
+          productos: wizardState.productosSeleccionados.length ? JSON.parse(JSON.stringify({
+            seleccionados: wizardState.productosSeleccionados,
+            custom: wizardState.productosCustom,
+            precios: wizardState.preciosProductos,
+            descripcion: wizardState.productosDescripcion,
           })) : undefined,
           estructura: wizardState.objetivo ? JSON.parse(JSON.stringify({
             objetivo: wizardState.objetivo,
@@ -135,7 +140,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           eventoEstacional: wizardState.eventoEstacional === "__custom__"
             ? wizardState.eventoCustom
             : wizardState.eventoEstacional || null,
-          currentStep: 7,
+          currentStep: 5,
           promptMaestro,
           promptVersion: "v1.0",
           brief: JSON.parse(JSON.stringify({
@@ -159,11 +164,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             cambios: wizardState.ofertaCambios,
             envio: wizardState.ofertaEnvio,
           })),
-          modelos: JSON.parse(JSON.stringify({
-            seleccionados: wizardState.modelosSeleccionados,
-            custom: wizardState.modelosCustom,
-            precios: wizardState.preciosModelos,
-            descripcion: wizardState.modelosDescripcion,
+          productos: JSON.parse(JSON.stringify({
+            seleccionados: wizardState.productosSeleccionados,
+            custom: wizardState.productosCustom,
+            precios: wizardState.preciosProductos,
+            descripcion: wizardState.productosDescripcion,
           })),
           estructura: JSON.parse(JSON.stringify({
             objetivo: wizardState.objetivo,
@@ -181,44 +186,64 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         },
       })
 
-      // Materializar AdSets y Pieces (borrar los anteriores si existen)
-      const existingAdSets = await db.adSet.findMany({ where: { campaignId: id }, select: { id: true } })
-      if (existingAdSets.length === 0) {
+      // Guardar conceptos creativos seleccionados — batch
+      if (wizardState.conceptos?.length) {
+        const existingConceptos = await db.concepto.count({ where: { campaignId: id } })
+        if (existingConceptos === 0) {
+          await db.concepto.createMany({
+            data: wizardState.conceptos.map((c, i) => ({
+              campaignId: id,
+              nombre: c.nombre,
+              hipotesis: c.hipotesis || null,
+              anguloMensajeria: c.anguloMensajeria || null,
+              frameworkCopy: c.frameworkCopy || null,
+              direccionVisual: c.direccionVisual || null,
+              isSelected: c.isSelected,
+              orden: i,
+            })),
+          })
+        }
+      }
+
+      // Materializar AdSets y Pieces — batch paralelo
+      const existingAdSets = await db.adSet.count({ where: { campaignId: id } })
+      if (existingAdSets === 0) {
         let adSetOrden = 0
-        for (const campana of wizardState.campanas ?? []) {
-          for (const conjunto of campana.conjuntos ?? []) {
-            const adSet = await db.adSet.create({
+        const adSetJobs = (wizardState.campanas ?? []).flatMap((campana) =>
+          (campana.conjuntos ?? []).map((conjunto) => ({ campana, conjunto, orden: adSetOrden++ }))
+        )
+        await Promise.all(
+          adSetJobs.map(({ campana, conjunto, orden }) =>
+            db.adSet.create({
               data: {
                 campaignId: id,
                 nombre: `${campana.nombre} · ${conjunto.nombre}`,
                 publico: conjunto.publico || null,
                 porcentajePresupuesto: conjunto.porcentaje || null,
-                orden: adSetOrden++,
+                orden,
+                pieces: {
+                  createMany: {
+                    data: (conjunto.piezas ?? []).map((pieza, pieceOrden) => ({
+                      estado: pieza.estado === "reserva" ? "RESERVA" : "ACTIVA",
+                      taskStatus: "PENDIENTE",
+                      modelo: pieza.producto || null,
+                      tipoPieza: pieza.tipoPieza || null,
+                      trafico: pieza.trafico || null,
+                      angulo: pieza.angulo || null,
+                      conciencia: pieza.conciencia || null,
+                      motivo: pieza.motivo || null,
+                      narrativa: pieza.narrativa || null,
+                      estructuraCopy: pieza.estructuraCopy || null,
+                      formato: pieza.formato || null,
+                      duracion: pieza.duracion || null,
+                      orden: pieceOrden,
+                    })),
+                  },
+                },
               },
             })
-            let pieceOrden = 0
-            for (const pieza of conjunto.piezas ?? []) {
-              await db.piece.create({
-                data: {
-                  adSetId: adSet.id,
-                  estado: pieza.estado === "reserva" ? "RESERVA" : "ACTIVA",
-                  taskStatus: "PENDIENTE",
-                  modelo: pieza.modelo || null,
-                  tipoPieza: pieza.tipoPieza || null,
-                  trafico: pieza.trafico || null,
-                  angulo: pieza.angulo || null,
-                  conciencia: pieza.conciencia || null,
-                  motivo: pieza.motivo || null,
-                  narrativa: pieza.narrativa || null,
-                  estructuraCopy: pieza.estructuraCopy || null,
-                  formato: pieza.formato || null,
-                  duracion: pieza.duracion || null,
-                  orden: pieceOrden++,
-                },
-              })
-            }
-          }
-        }
+          )
+        )
       }
 
       return NextResponse.json({ ok: true })
@@ -238,16 +263,45 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       if (!allowed.includes(newStatus)) {
         return NextResponse.json({ error: `No se puede pasar de ${current.status} a ${newStatus}` }, { status: 400 })
       }
-      await db.campaign.update({ where: { id }, data: { status: newStatus } })
-      await db.auditLog.create({
-        data: {
-          userId: session.user.id!,
-          campaignId: id,
-          action: "campaign.status",
-          diff: { from: current.status, to: newStatus } as object,
-        },
-      })
+      await db.$transaction([
+        db.campaign.update({ where: { id }, data: { status: newStatus } }),
+        db.auditLog.create({
+          data: {
+            userId: session.user.id!,
+            campaignId: id,
+            action: "campaign.status",
+            diff: { from: current.status, to: newStatus } as object,
+          },
+        }),
+      ])
       return NextResponse.json({ ok: true, status: newStatus })
+    }
+
+    if (action === "apply-work-plan") {
+      const { workPlan } = body as { workPlan: Array<{ pieceId: string; priority: string; dueDate?: string }> }
+      if (!Array.isArray(workPlan) || workPlan.length === 0) {
+        return NextResponse.json({ error: "workPlan inválido" }, { status: 400 })
+      }
+      const pieceIds = workPlan.map((p) => p.pieceId)
+      const validPieces = await db.piece.findMany({
+        where: { id: { in: pieceIds }, adSet: { campaignId: id } },
+        select: { id: true },
+      })
+      const validIds = new Set(validPieces.map((p) => p.id))
+      await db.$transaction(
+        workPlan
+          .filter((p) => validIds.has(p.pieceId))
+          .map((p) =>
+            db.piece.update({
+              where: { id: p.pieceId },
+              data: {
+                priority: p.priority ?? undefined,
+                dueDate: p.dueDate ? new Date(p.dueDate) : undefined,
+              },
+            })
+          )
+      )
+      return NextResponse.json({ ok: true, updated: validPieces.length })
     }
 
     if (action === "archive") {
@@ -256,15 +310,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         select: { isArchived: true },
       })
       if (!current) return NextResponse.json({ error: "Not found" }, { status: 404 })
-      await db.campaign.update({ where: { id }, data: { isArchived: !current.isArchived } })
-      await db.auditLog.create({
-        data: {
-          userId: session.user.id!,
-          campaignId: id,
-          action: current.isArchived ? "campaign.unarchive" : "campaign.archive",
-          diff: {} as object,
-        },
-      })
+      await db.$transaction([
+        db.campaign.update({ where: { id }, data: { isArchived: !current.isArchived } }),
+        db.auditLog.create({
+          data: {
+            userId: session.user.id!,
+            campaignId: id,
+            action: current.isArchived ? "campaign.unarchive" : "campaign.archive",
+            diff: {} as object,
+          },
+        }),
+      ])
       return NextResponse.json({ ok: true, isArchived: !current.isArchived })
     }
 
@@ -302,7 +358,7 @@ export async function POST(
         status: "DRAFT",
         brief: source.brief ?? undefined,
         oferta: source.oferta ?? undefined,
-        modelos: source.modelos ?? undefined,
+        productos: source.productos ?? undefined,
         estructura: source.estructura ?? undefined,
         presupuesto: source.presupuesto ?? undefined,
         equipo: source.equipo ?? undefined,

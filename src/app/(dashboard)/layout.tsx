@@ -12,14 +12,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      <DashboardSidebar role={role} />
+      <div className="print:hidden h-full">
+        <DashboardSidebar role={role} />
+      </div>
       <div className="flex-1 flex flex-col overflow-hidden">
-        <DashboardTopbar
-          userName={session.user.name ?? ""}
-          userEmail={session.user.email ?? ""}
-          userRole={role}
-        />
-        <main className="flex-1 overflow-y-auto">
+        <div className="print:hidden">
+          <DashboardTopbar
+            userName={session.user.name ?? ""}
+            userEmail={session.user.email ?? ""}
+            userRole={role}
+          />
+        </div>
+        <main className="flex-1 overflow-y-auto print:overflow-visible">
           {children}
         </main>
       </div>

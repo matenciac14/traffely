@@ -161,3 +161,17 @@
 ::-webkit-scrollbar-thumb:hover {
   background: oklch(0.867 0.022 252.9);
 }
+
+/* ── Print styles — brief export ──────────────────────────────────────────── */
+@media print {
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+  body { background: white !important; }
+
+  /* Expand accordions so all piece content is visible when printing */
+  [data-print-expand] { display: block !important; }
+
+  /* Page breaks */
+  .print-break-before { break-before: page; }
+  .print-break-avoid  { break-inside: avoid; }
+}

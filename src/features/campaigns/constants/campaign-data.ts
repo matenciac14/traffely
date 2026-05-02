@@ -1,30 +1,15 @@
-// Constantes portadas 1:1 del prototipo Serrano Campaign Builder v3.7
-
-export const MODELOS_BASE = [
-  "NB 530",
-  "NB 9060",
-  "Nike V2K",
-  "On Cloud",
-  "Adidas Adizero",
-  "Adidas Ultraboost",
-  "Adidas Samba",
-  "Nike Free Metcon",
-  "Nike Zoom",
-  "Asics",
-] as const
-
 export const EVENTOS_ESTACIONALES = [
   { mes: "Enero", nombre: "Reset del año" },
   { mes: "Febrero", nombre: "San Valentín" },
   { mes: "Marzo", nombre: "Día de la Mujer" },
   { mes: "Mayo", nombre: "Día de la Madre" },
   { mes: "Junio", nombre: "Día del Padre" },
-  { mes: "Junio", nombre: "Primatón mitad de año" },
+  { mes: "Junio", nombre: "Mitad de año / Mid-Year Sale" },
   { mes: "Agosto", nombre: "Regreso a clase" },
   { mes: "Septiembre", nombre: "Amor y Amistad" },
   { mes: "Octubre", nombre: "Halloween" },
   { mes: "Noviembre", nombre: "Black Friday" },
-  { mes: "Diciembre", nombre: "Primatón fin de año" },
+  { mes: "Diciembre", nombre: "Fin de año / Year-End Sale" },
 ] as const
 
 export const ANGULOS_BASE = [
@@ -104,9 +89,9 @@ export const PUBLICOS = [
 
 export const CHIPS_DETALLE_POR_OFERTA: Record<string, string[]> = {
   escalonada: [
-    "1 par envío gratis, 2 pares -10%, 3+ -20%",
+    "Compra 1 envío gratis, 2 unidades -10%, 3+ -20%",
     "Compra 2 -15%, 3 -20%, 4+ -25%",
-    "Desde el par 2, -20% en toda la compra",
+    "Desde la segunda unidad, -20% en toda la compra",
   ],
   descuento: [
     "20% OFF toda la tienda",
@@ -115,62 +100,64 @@ export const CHIPS_DETALLE_POR_OFERTA: Record<string, string[]> = {
   ],
   "2x1": [
     "Lleva 2 paga 1 (el de menor valor gratis)",
-    "3x2 en running",
-    "Combo 2 pares $295.000",
+    "3x2 en artículos seleccionados",
+    "Combo 2 unidades con descuento",
   ],
   envio: [
-    "Envío gratis desde $150.000",
-    "Envío gratis todo Colombia sin mínimo",
-    "Envío gratis 24h Cali",
+    "Envío gratis desde monto mínimo",
+    "Envío gratis sin mínimo de compra",
+    "Envío express sin costo adicional",
   ],
   financiacion: [
-    "Addi hasta 4 cuotas sin interés",
-    "Sistecrédito 12 meses",
-    "Addi + 10% OFF extra",
+    "Hasta 4 cuotas sin interés",
+    "12 meses de financiación",
+    "Financiación + 10% OFF extra",
   ],
   "precio-plano": [
-    "Todo a $195.000",
-    "Dos precios: $150.000 y $250.000",
-    "Precio plano $180.000 modelos seleccionados",
+    "Todo a precio único",
+    "Dos precios según categoría",
+    "Precio plano en productos seleccionados",
   ],
   otra: ["Sorteo + descuento", "Preventa VIP", "Oferta flash 24h"],
 }
 
 export const CHIPS_PAGO = [
-  "Addi",
-  "Sistecrédito",
-  "Transferencia Bancolombia",
+  "Tarjeta de crédito",
+  "Tarjeta débito",
+  "Transferencia bancaria",
   "PSE",
   "Efectivo contra entrega",
-  "Tarjeta de crédito",
+  "Financiación disponible",
+  "Pago en cuotas",
 ]
 
-export const CHIPS_REGALO = [
-  "Par de medias de regalo",
-  "Bolso ecológico",
-  "Cordones extra",
-  "Sin regalo",
-]
+// Chips contextuales según tipo de producto
+export const CHIPS_BY_TIPO = {
+  fisico: {
+    regalo: ["Muestra de producto gratis", "Empaque especial", "Accesorio de regalo", "Descuento en próxima compra", "Sin regalo"],
+    garantia: ["30 días por defectos", "6 meses de garantía", "1 año de garantía", "Garantía de satisfacción", "Sin garantía"],
+    cambios: ["Devolución en 8 días", "Cambio o devolución en 15 días", "Reembolso garantizado 30 días", "No aplica cambios en oferta"],
+    envio: ["Envío gratis", "Envío gratis desde monto mínimo", "Envío express disponible", "Entrega en 24h", "Sin costo de envío"],
+  },
+  digital: {
+    regalo: ["Demo gratuita 14 días", "Mes gratis al contratar", "Funciones premium incluidas", "Capacitación de onboarding", "Sin regalo"],
+    garantia: ["30 días de prueba sin riesgo", "Garantía de satisfacción 30 días", "Soporte técnico incluido", "Sin garantía"],
+    cambios: ["Cancelación en cualquier momento", "Reembolso en 30 días", "Cambio de plan disponible", "Sin reembolso"],
+    envio: ["Acceso inmediato al comprar", "Entrega por email", "Activación instantánea", "Descarga disponible de inmediato"],
+  },
+  servicio: {
+    regalo: ["Consulta inicial gratuita", "Análisis sin costo", "Sesión de diagnóstico gratis", "Auditoría gratuita", "Sin regalo"],
+    garantia: ["Satisfacción garantizada", "Revisiones ilimitadas incluidas", "Resultados o devolvemos", "Sin garantía"],
+    cambios: ["Ajustes sin costo adicional", "Revisiones hasta aprobar", "Cambios en 48h", "Sin cambios post-entrega"],
+    envio: ["100% remoto", "Entregables digitales", "Reuniones por videollamada", "Trabajo asíncrono"],
+  },
+} as const
 
-export const CHIPS_GARANTIA = [
-  "30 días por defectos de fábrica",
-  "6 meses de garantía",
-  "1 año de garantía",
-  "Sin garantía",
-]
-
-export const CHIPS_CAMBIOS = [
-  "Cambio por talla en 8 días",
-  "Cambio por talla o modelo en 15 días",
-  "No aplica cambios en oferta",
-]
-
-export const CHIPS_ENVIO = [
-  "Envío gratis toda Colombia",
-  "Envío gratis desde $150.000",
-  "Envío $12.000 Servientrega",
-  "Envío 24h Cali / 48-72h resto",
-]
+// Fallback genérico cuando no se ha definido tipo
+export const CHIPS_REGALO = CHIPS_BY_TIPO.fisico.regalo
+export const CHIPS_GARANTIA = CHIPS_BY_TIPO.fisico.garantia
+export const CHIPS_CAMBIOS = CHIPS_BY_TIPO.fisico.cambios
+export const CHIPS_ENVIO = CHIPS_BY_TIPO.fisico.envio
 
 export const OFERTAS_CONFIG = [
   { val: "escalonada", titulo: "Escalonada por cantidad", desc: "1 par envío gratis · 2 pares -10% · 3 pares -15% · 4+ -20%", icon: "📊" },
@@ -182,13 +169,7 @@ export const OFERTAS_CONFIG = [
   { val: "otra", titulo: "Otra oferta personalizada", desc: "Tú describes la promoción", icon: "✍️" },
 ] as const
 
-export const EQUIPO_DEFAULT = [
-  { rol: "CEO", email: "Administrativo@tennispremiumcol.com" },
-  { rol: "Dir. creativa", email: "creativo@tennispremiumcol.com" },
-  { rol: "Diseñador", email: "diseno@tennispremiumcol.com" },
-  { rol: "Trafficker", email: "Trafico@tennispremiumcol.com" },
-  { rol: "Community", email: "Community@tennispremiumcol.com" },
-]
+export const EQUIPO_DEFAULT: { rol: string; email: string }[] = []
 
 export const DURACIONES_VIDEO = ["15s", "20s", "30s", "45s", "60s"] as const
 

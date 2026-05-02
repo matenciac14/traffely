@@ -2,10 +2,13 @@ import type { CampaignWizardState, ValidationResult } from "../types"
 
 export function validarPaso(state: CampaignWizardState, paso: number): ValidationResult {
   switch (paso) {
+    // ── Step 1 · Empresa ────────────────────────────────────────────────────
     case 1:
-      if (!state.empresa.trim()) return { ok: false, error: "Ingresa el nombre de la empresa" }
+      if (!state.empresa.trim()) return { ok: false, error: "Selecciona o ingresa el nombre de la empresa" }
+      if (!state.empresaId) return { ok: false, error: "Selecciona una empresa de la lista para cargar su identidad de marca" }
       break
 
+    // ── Step 2 · Brief ──────────────────────────────────────────────────────
     case 2:
       if (!state.tipoCampana) return { ok: false, error: "Selecciona evergreen o estacional" }
       if (state.tipoCampana === "estacional") {
@@ -16,15 +19,18 @@ export function validarPaso(state: CampaignWizardState, paso: number): Validatio
       if (!state.nombreCampana.trim()) return { ok: false, error: "Ingresa el nombre de la campaña" }
       break
 
+    // ── Step 3 · Oferta & Catálogo ──────────────────────────────────────────
     case 3:
       if (!state.tipoOferta) return { ok: false, error: "Selecciona un tipo de oferta" }
       if (!state.contextoOferta.trim()) return { ok: false, error: "Detalla tu oferta" }
+      if (state.productosSeleccionados.length === 0) return { ok: false, error: "Agrega al menos un producto al catálogo" }
       break
 
+    // ── Step 4 · Conceptos creativos (opcional — siempre pasa) ─────────────
     case 4:
-      if (state.modelosSeleccionados.length === 0) return { ok: false, error: "Selecciona al menos un modelo" }
       break
 
+    // ── Step 5 · Estructura (Campañas + Piezas) ─────────────────────────────
     case 5: {
       if (!state.objetivo) return { ok: false, error: "Selecciona el objetivo de la campaña" }
       if (!state.tipoPresupuesto) return { ok: false, error: "Selecciona ABO o CBO" }
@@ -64,7 +70,7 @@ export function validarPaso(state: CampaignWizardState, paso: number): Validatio
           for (let pi = 0; pi < state.campanas[ci].conjuntos[cji].piezas.length; pi++) {
             const p = state.campanas[ci].conjuntos[cji].piezas[pi]
             const faltantes: string[] = []
-            if (!p.modelo) faltantes.push("modelo")
+            if (!p.producto) faltantes.push("producto")
             if (!p.tipoPieza) faltantes.push("tipo de pieza")
             if (!p.trafico) faltantes.push("tráfico")
             if (!p.angulo) faltantes.push("ángulo")
@@ -103,15 +109,12 @@ export function validarPaso(state: CampaignWizardState, paso: number): Validatio
       break
     }
 
+    // ── Step 6 · Presupuesto ────────────────────────────────────────────────
     case 6:
       if (!state.presupuestoValor) return { ok: false, error: "Ingresa el presupuesto" }
       if (!state.fechaInicio) return { ok: false, error: "Ingresa la fecha de inicio" }
       if (!state.sinFechaFin && !state.fechaFin)
         return { ok: false, error: "Ingresa la fecha de fin o marca evergreen" }
-      break
-
-    case 7:
-      // Paso informativo, sin validación obligatoria
       break
   }
 

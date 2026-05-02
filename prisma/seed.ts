@@ -95,6 +95,29 @@ async function upsertEmpresa(data: {
   }
 }
 
+const INITIAL_SYSTEM_PROMPT = `Eres un copywriter senior y director creativo especializado en publicidad digital para el mercado latinoamericano.
+Tu expertise es en campañas de Meta Ads (Facebook e Instagram) para marcas de ecommerce y retail en LatAm.
+Generas guiones de video UGC, copys de anuncios y textos para piezas gráficas que convierten.
+Usas lenguaje cercano al consumidor latinoamericano, sin corporativismo ni clichés.
+Adaptas el tono y registro según la identidad de cada marca — la identidad específica del cliente se incluye en el contexto del sistema.
+Cuando generas guiones, sigues exactamente la estructura de narrativa, ángulo y copy especificados en el brief.`
+
+async function seedAiCore() {
+  const existing = await db.aiCore.findFirst({ where: { isActive: true } })
+  if (existing) {
+    console.log(`  ↺ AiCore ya existe (v${existing.version}) — sin cambios`)
+    return
+  }
+  await db.aiCore.create({
+    data: {
+      systemPrompt: INITIAL_SYSTEM_PROMPT,
+      version: 1,
+      isActive: true,
+    },
+  })
+  console.log("  + AiCore creado (v1) con SYSTEM_PROMPT genérico")
+}
+
 async function main() {
   console.log("🌱 Seeding usuarios y empresas demo…\n")
 
@@ -156,6 +179,10 @@ async function main() {
       instruccionesExtra: "Siempre matizar tiempos de entrega (24-72h en ciudades principales, no prometer tiempos absolutos nacionales). Para la Primatón (junio y diciembre): conectar con liquidez extra, darse el gusto merecido, aprovechar la prima. Un anuncio = una idea. Mostrar el producto como protagonista en piezas de ventas. Especificidad vende más que generalidades.",
     },
   })
+
+  // ── AiCore ─────────────────────────────────────────────────────────────────
+  console.log("")
+  await seedAiCore()
 
   // ── Resumen ────────────────────────────────────────────────────────────────
   console.log("\n✅ Seed completado\n")

@@ -21,7 +21,13 @@
 - No asumir que el problema está en el código si puede ser infraestructura (env vars, S3, credenciales)
 
 ## Qué es
-SaaS multi-tenant para equipos de ecommerce — gestión de campañas Meta Ads con brief estructurado, generación de contenido con IA (Claude), board de tareas tipo Jira para el equipo creativo, y panel de administración por workspace.
+SaaS multi-tenant para gestión de campañas Meta Ads — sirve tanto a agencias que manejan múltiples clientes como a marcas que gestionan sus propias campañas. Core: brief estructurado con IA (Claude), board de tareas tipo Jira para el equipo creativo, métricas de Meta Ads, y panel SUPER_ADMIN para gobierno del sistema.
+
+**Tipos de workspace gestionados desde SuperAdmin (no hay UI de tipo):**
+- `AGENCY`: maneja múltiples Empresas/clientes dentro del workspace
+- `BRAND`: una empresa gestionando sus propias campañas
+
+La diferencia es de configuración, no de código. El SuperAdmin activa/limita funcionalidades por workspace.
 
 ## Stack
 - Next.js 16 + TypeScript + App Router
@@ -45,7 +51,8 @@ src/
 │   ├── admin/                    ← solo SUPER_ADMIN
 │   │   ├── workspaces/           ← lista y detalle de clientes
 │   │   ├── roadmap/              ← build tracker
-│   │   └── ai-usage/             ← consumo IA por workspace
+│   │   ├── ai-usage/             ← consumo IA por workspace
+│   │   └── ai-core/              ← editor SYSTEM_PROMPT + reglas IA (Fase 23)
 │   └── api/
 │       ├── campaigns/            ← CRUD + autosave + generate (SSE)
 │       ├── pieces/[id]/          ← GET + PATCH + comments + generate (SSE) + upload (S3)
@@ -104,6 +111,90 @@ Workspace → AiUsage
 - **S3**: bucket privado — usar siempre presigned URLs para upload (PUT, 15min) y preview (GET, 1hr)
 - **API keys workspace**: cifrar con AES-256-GCM antes de guardar en DB (`lib/utils/crypto.ts`)
 
+## Catálogo de Productos por Empresa (Fase 12 — ✅ implementado)
+
+### Qué hace
+Los productos se cargan una vez por empresa en `/empresas/[id]` y el wizard Step 3 los reutiliza con precios pre-rellenados. Si hay Shopify conectado → muestra ShopifyProductPicker; si no → catálogo interno.
+
+### Modelo de datos
+```
+Empresa
+  └── Producto[]
+        ├── nombre, descripcion, sku
+        ├── precioActual, precioAntes
+        └── isActive
+```
+
+### Shopify migration — pendiente (bloqueado por Fase 10 en hold)
+- `ShopifyIntegration` aún usa `workspaceId` — migrar a `empresaId` cuando se retome Fase 10
+- `ShopifyProductPicker` aún opera con workspaceId — actualizar junto con lo anterior
+
+---
+
+## Arquitectura AI — 4 capas (regla de diseño)
+
+El prompt que recibe Claude siempre se construye en 4 capas. **NUNCA** mezclar contenido de capas distintas.
+
+```
+Capa 0 — AI Core (DB, editable por SUPER_ADMIN en /admin/ai-core)
+  SYSTEM_PROMPT guardado en DB con historial de versiones.
+  Reglas base del sistema: tono genérico, formato de respuesta, industrias soportadas.
+  Reglas de sugerencia de campañas y asignación de tareas por rol creativo.
+  ✅ Aplica a todos los workspaces por igual
+  ❌ Nunca información de cliente específico (eso va en Capa 2)
+
+Capa 1 — SYSTEM_PROMPT (lib/ai/client.ts ← carga SYSTEM_PROMPT activo desde DB)
+  ✅ Genérico: "Eres un estratega creativo para Meta Ads en LatAm"
+  ❌ Nunca: industria específica, cliente específico, reglas de calzado, "24-72h ciudades principales"
+
+Capa 2 — EmpresaIdentidad (system prompt dinámico en generate routes)
+  Campos base: tono, publicoObjetivo, propuestasValor, palabrasProhibidas, instruccionesExtra
+  Campos visuales: colores, tipografias
+  Campos avanzados: contextoNegocio, reglasLegales, eventosKey
+  Campos de negocio (Fase 24 ✅): industria, modeloNegocio, ticketPromedio, cicloVenta,
+                                   temporadasClave, equipoCreativo, metaPrincipal
+  → 15 campos en total. Esta capa define TODO lo específico de la empresa/cliente
+
+Capa 3 — Brief de campaña (promptMaestro, generado por prompt-generator.ts)
+  Solo lo específico de esta campaña: objetivo, oferta, productos, fechas, piezas
+  ❌ Nunca hardcodear aquí reglas de industria ni contexto de negocio
+```
+
+### Regla de oro
+Si algo aplica solo a una industria o a un cliente, **no va en código** — va en `EmpresaIdentidad`.
+Si aplica a todos los workspaces del sistema, va en `AI Core` (Capa 0), editable desde el panel admin.
+Esto permite que Traffely funcione para cualquier industria sin tocar código.
+
+### AI Core — Panel SuperAdmin (/admin/ai-core)
+- SYSTEM_PROMPT editable desde UI (textarea con preview en tiempo real)
+- Historial de versiones con fecha, contenido anterior y botón "restaurar"
+- Reglas de sugerencias de campaña (según industria de EmpresaIdentidad)
+- Reglas de asignación automática de tareas por rol del equipo
+- El SYSTEM_PROMPT activo se carga desde DB en cada request (cache 60s)
+- Seed inicial en `prisma/seed.ts` — crea AiCore v1 idempotente ✅ (Fase 23)
+
+### Convención de nombres — Fase 22
+`modelos` → `productos` en toda la codebase (store, DB, API, UI, types).
+No son modelos de moda — son productos de cualquier industria.
+
+| Antes | Después |
+|-------|---------|
+| `modelosCustom` | `productosCustom` |
+| `modelosSeleccionados` | `productosSeleccionados` |
+| `preciosModelos` | `preciosProductos` |
+| `modelosDescripcion` | `productosDescripcion` |
+| `MODELOS_BASE` | eliminado |
+| "Catálogo de modelos" | "Catálogo de productos" |
+
+### Generación de assets (futuro)
+Cuando se integren APIs de imagen/video (Replicate, Runway):
+- El `guionGenerado` de la pieza es el input
+- Se genera un prompt de asset estructurado (escena, estilo, dimensiones)
+- El asset generado se sube a S3 y se asigna a la pieza
+- El pipeline: guionGenerado → prompt asset → API externa → S3 → Piece.archivoUrl
+
+---
+
 ## Arquitectura Multi-Empresa (Fase 12)
 
 ### Modelo de datos
@@ -123,9 +214,11 @@ Workspace (agencia/cuenta)
 - Relación 1:N con `Campaign`
 - Relación 1:1 con `ShopifyIntegration` (migrado desde Workspace)
 
-### EmpresaIdentidad — campos (equivale al aiProfile actual por workspace)
-- `tono`, `publicoObjetivo`, `propuestasValor`, `palabrasProhibidas`, `instruccionesExtra`
-- `colores`, `tipografias` (para referencia del creativo)
+### EmpresaIdentidad — campos (15 campos totales — Fase 24 ✅)
+- **Base**: `tono`, `publicoObjetivo`, `propuestasValor`, `palabrasProhibidas`, `instruccionesExtra`
+- **Visuales**: `colores`, `tipografias` (para referencia del creativo)
+- **Contexto avanzado**: `contextoNegocio`, `reglasLegales`, `eventosKey`
+- **Contexto de negocio**: `industria`, `modeloNegocio`, `ticketPromedio`, `cicloVenta`, `temporadasClave`, `equipoCreativo`, `metaPrincipal`
 
 ### Rutas de API
 - `GET/POST /api/empresas`
@@ -191,6 +284,21 @@ Workspace (agencia/cuenta)
 - No se puede cambiar el propio rol ni modificar otro OWNER
 - API: `/api/workspace/members` (GET/POST) y `/api/workspace/members/[id]` (PATCH/DELETE)
 
+## Board Pro (Fase 17 — parcialmente implementado ✅)
+- **Priority badge**: URGENTE (rojo) / ALTA (naranja) / MEDIA (azul) / BAJA (muted) visible en PieceCard sin abrir drawer
+- **Due date badge**: días restantes, "Vence hoy", "Vence en Xd" (ámbar), "Vencida hace Xd" (rojo destructive) — sin mostrar si APROBADO/PUBLICADO
+- **Workload view**: toggle Kanban|Carga en header. Vista "Carga" agrupa piezas por asignado con semáforo Alta/Media/Baja y conteo de vencidas
+- **Pendiente**: filtro por prioridad, activity feed (requiere DB), múltiples asignados, timeline/gantt
+
+## Pipeline de Conceptos Creativos (Fase 26 ✅)
+- Paso 4 del wizard (entre Oferta y Estructura) — 6 pasos totales: Empresa→Brief→Oferta→Conceptos→Estructura→Presupuesto
+- Claude genera 5 conceptos: nombre, hipótesis, ángulo, framework, dirección visual
+- Ángulos: Dolor / Aspiracional / Prueba social / Urgencia / Curiosidad / Beneficio directo
+- Frameworks: AIDA / PAS / BAB / FAB / 4U / Storytelling / Star-Story-Solution
+- Paso opcional — sin seleccionar = generación libre; con conceptos = piezas heredan ángulo y framework
+- API `/api/campaigns/generate-concepts`: usa todos los 15 campos de EmpresaIdentidad (Fase 24 incluida)
+- Mock con 5 conceptos pre-armados cuando no hay API key
+
 ## Board — Módulo de gestión de tareas
 
 ### Arquitectura
@@ -234,6 +342,14 @@ Campos en `aiProfile Json?` de Workspace:
 - `propuestasValorFijas` — siempre incluir en copys
 - `palabrasProhibidas` — nunca usar
 - `instruccionesExtra` — reglas adicionales
+
+## Registro self-serve (Fase 6 — implementado)
+- Ruta pública: `POST /api/auth/register` — crea Workspace + OWNER en una sola transacción
+- Rate limit: 5 registros por IP cada 24h (Upstash Redis + fallback in-memory)
+- Slug: generado desde workspaceName, normalizado (sin acentos, sin caracteres especiales), único garantizado
+- Auto-login tras registro exitoso vía `signIn("credentials")`
+- AuditLog `workspace.register` con workspaceId y plan
+- Página `/register`: 4 campos — nombre de agencia/empresa, nombre personal, email, contraseña
 
 ## Usuarios demo (seed)
 | Email | Password | Rol |
@@ -345,18 +461,64 @@ Campos en `aiProfile Json?` de Workspace:
 - **Export PDF**: vía `window.print()` con CSS print styles (sin backend extra)
 - **Backward compat**: campañas existentes con `promptMaestro` texto plano siguen mostrándose
 
-## Dashboard de métricas (Fase 19)
-- Ruta `/metrics` — OWNER y SUPER_ADMIN
-- KPIs producción: campañas activas, piezas por estado, on-time rate, carga equipo, IA usada vs límite
-- Vistas: global workspace → por empresa → por campaña
-- Sin Meta Ads: producción metrics + placeholder ROAS/CPC (se activan con Fase 7)
-- Export CSV para reportes al cliente
+## Dashboard de métricas (Fase 19 ✅)
+- Ruta `/metrics` — OWNER y SUPER_ADMIN — cards por empresa con badge Meta ✓
+- `/metrics/empresa/[id]` — 5 tabs: Producción, Creativos, Meta Ads, Audiencias, Analytics
+- **Tab Producción**: KPIs (campañas activas, piezas, IA generada, retrasos), barra por estado, workload equipo, actividad reciente
+- **Tab Creativos**: Grid piezas PUBLICADO con preview S3, filtros por campaña + tipo de pieza, badge "En Meta"
+- **Tab Meta**: KPI cards con comparativa ▲▼% vs período anterior (segunda llamada API al período previo), tabla campañas con ROAS badge
+- **Tab Audiencias**: edad/género, dispositivos, placement, top 10 países
+- **Tab Analytics**: gráfico dual-axis Spend vs ROAS (Recharts), barras ROAS por campaña
+- Export CSV campañas Meta
+- **Pendiente (Fase 28)**: badge performance + métricas individuales por creativo (requiere `metaCampaignId` en schema Campaign)
 
 ## Chat de equipo (Fase 20)
 - Scope mínimo: canal #general + canal por campaña (NO Slack completo)
 - **Decisión de producto**: implementar solo si clientes lo piden explícitamente
 - Polling 10s en MVP (sin WebSocket/Pusher)
 - Menciones @usuario + link /pieza contextual
+
+## Motor Creativo — Integración claude-ads (Fases 25-28)
+
+Inspirado en `github.com/AgriciDaniel/claude-ads` (250+ checks, pipeline de conceptos, copy frameworks). Lo que Traffely integra:
+
+### Generación de Copy Profesional (Fase 25 — implementado)
+- **Frameworks de copy en piece generate**: AIDA, PAS, BAB, 4P, FAB, Storytelling, Star-Story-Solution
+  - El framework viene de `Piece.estructuraCopy` (ya seleccionado en Step 5)
+  - El prompt obliga a Claude a aplicar la estructura declarada en guión Y copy
+- **Char limits Meta Ads**: Primary Text 125 chars (óptimo), Headline 40 chars, Descripción 30 chars
+- **2 variantes A/B**: cada generación produce Variante A y Variante B de primary text + headline
+- **Hook rule**: palabra de gancho en primeras 3 palabras del headline (obligatoria)
+- **Image Generation Brief**: cada pieza genera un brief estructurado de imagen:
+  - Composición, colores hex, mood, metáfora visual (80 palabras max)
+  - Safe zones por plataforma (Meta Feed: lower 30% abierto; Stories: top/bottom 15% minimal)
+  - Dimensiones y aspect ratio
+  - Modo de generación: Product / Portrait / UI/Web / Abstract / Landscape
+
+### Pipeline de Conceptos Creativos (Fase 26 — pendiente)
+```
+EmpresaIdentidad + Brief → Claude genera 3-5 Conceptos
+  ├── nombre (memorable, no genérico)
+  ├── hipotesis (por qué va a funcionar)
+  ├── anguloMensajeria (dolor, aspiracional, prueba social, etc.)
+  ├── frameworkCopy (AIDA/PAS/BAB/etc.)
+  └── direccionVisual (para Image Generation Brief)
+OWNER selecciona conceptos → piezas heredan su concepto
+```
+
+### Detección de Fatiga Creativa (Fase 27 — pendiente)
+- Criterio: pieza PUBLICADO con CTR caída >20% en 14 días vs baseline → `fatigaDetectadaAt`
+- Badge "Fatiga" en PieceCard + alert en métricas + notificación al OWNER
+- CTA: crear pieza renovada ("Refresh") basada en la fatigada
+
+### Meta Ads Health Score (Fase 28 — pendiente)
+- Score 0-100 calculado de 50 checks en 4 categorías (CAPI, creativos, estructura, audiencias)
+- Tab "Auditoría" en `/metrics/empresa/[id]`
+- Quick Wins priorizados por impacto generados por Claude
+- Badge de score en cards de empresa
+
+### Diferencia vs claude-ads
+claude-ads es un CLI tool para auditors técnicos. Traffely integra la misma inteligencia como **feature de producto** para agencias y marcas LatAm — sin CSV exports, sin comandos, todo en el contexto del workflow de producción existente.
 
 ## Ver también
 ~/.claude/CLAUDE.md para reglas globales de Miguel

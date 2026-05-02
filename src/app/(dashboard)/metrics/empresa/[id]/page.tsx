@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import {
@@ -86,14 +86,26 @@ interface MetricsResponse {
   meta: MetaData | null
 }
 
-function KpiCard({ label, value, sub, alert = false }: { label: string; value: string | number; sub?: string; alert?: boolean }) {
+function KpiCard({ label, value, sub, alert = false, delta }: { label: string; value: string | number; sub?: string; alert?: boolean; delta?: number | null }) {
   return (
     <div className="bg-card border border-border rounded-2xl p-4">
       <p className="text-xs text-muted-foreground mb-1">{label}</p>
       <p className={`text-2xl font-bold ${alert ? "text-destructive" : "text-foreground"}`}>{value}</p>
-      {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
+      {delta != null && (
+        <p className={`text-xs mt-0.5 font-medium ${delta > 0 ? "text-emerald-600" : delta < 0 ? "text-destructive" : "text-muted-foreground"}`}>
+          {delta > 0 ? "▲" : delta < 0 ? "▼" : "="} {Math.abs(delta)}% vs período anterior
+        </p>
+      )}
+      {sub && delta == null && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
     </div>
   )
+}
+
+function pctDelta(curr: string | null | undefined, prev: string | null | undefined): number | null {
+  const c = parseFloat(curr || "0")
+  const p = parseFloat(prev || "0")
+  if (p === 0) return null
+  return Math.round((c - p) / p * 100)
 }
 
 function timeAgo(iso: string): string {
@@ -130,8 +142,11 @@ export default function EmpresaDashboardPage() {
   const [tab, setTab] = useState<TabKey>("produccion")
   const [preset, setPreset] = useState<DatePreset>("30")
   const [data, setData] = useState<MetricsResponse | null>(null)
+  const [prevData, setPrevData] = useState<MetricsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [filterCampaign, setFilterCampaign] = useState("")
+  const [filterTipo, setFilterTipo] = useState("")
 
   const dateRangeParams = useCallback(() => {
     const until = new Date().toISOString().slice(0, 10)
@@ -139,26 +154,54 @@ export default function EmpresaDashboardPage() {
     return `since=${since}&until=${until}`
   }, [preset])
 
+  const prevDateRangeParams = useCallback(() => {
+    const days = parseInt(preset)
+    const until = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)
+    const since = new Date(Date.now() - days * 2 * 86400000).toISOString().slice(0, 10)
+    return `since=${since}&until=${until}`
+  }, [preset])
+
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/metrics/empresa/${id}?${dateRangeParams()}`)
+      const [res, prevRes] = await Promise.all([
+        fetch(`/api/metrics/empresa/${id}?${dateRangeParams()}`),
+        fetch(`/api/metrics/empresa/${id}?${prevDateRangeParams()}`),
+      ])
       if (!res.ok) { setError("Error al cargar métricas"); return }
       setData(await res.json() as MetricsResponse)
+      if (prevRes.ok) setPrevData(await prevRes.json() as MetricsResponse)
     } catch {
       setError("Error de red")
     } finally {
       setLoading(false)
     }
-  }, [id, dateRangeParams])
+  }, [id, dateRangeParams, prevDateRangeParams])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => { setFilterCampaign(""); setFilterTipo("") }, [data])
 
   const prod = data?.produccion
   const meta = data?.meta
+  const prevMeta = prevData?.meta
   const creativos = data?.creativos ?? []
   const metaEnabled = data?.empresa?.metaEnabled ?? false
+
+  const creativoCampaigns = useMemo(() => {
+    const seen = new Set<string>()
+    return creativos.filter(c => { if (seen.has(c.campaignId)) return false; seen.add(c.campaignId); return true })
+  }, [creativos])
+
+  const creativoTipos = useMemo(() => (
+    [...new Set(creativos.map(c => c.tipoPieza).filter(Boolean))] as string[]
+  ), [creativos])
+
+  const filteredCreativos = useMemo(() => creativos.filter(c => {
+    if (filterCampaign && c.campaignId !== filterCampaign) return false
+    if (filterTipo && c.tipoPieza !== filterTipo) return false
+    return true
+  }), [creativos, filterCampaign, filterTipo])
 
   const tabs: { key: TabKey; label: string }[] = [
     { key: "produccion", label: "Producción" },
@@ -337,22 +380,62 @@ export default function EmpresaDashboardPage() {
       {/* ── TAB: Creativos ──────────────────────────────────────────────── */}
       {!loading && tab === "creativos" && (
         <div className="space-y-4">
-          {creativos.length === 0 ? (
+          {/* Filtros */}
+          {creativos.length > 0 && (
+            <div className="flex gap-2 flex-wrap">
+              <select value={filterCampaign} onChange={e => setFilterCampaign(e.target.value)}
+                className="h-8 px-3 text-xs border border-border rounded-lg bg-background text-foreground focus:outline-none">
+                <option value="">Todas las campañas</option>
+                {creativoCampaigns.map(c => (
+                  <option key={c.campaignId} value={c.campaignId}>{c.campaignName}</option>
+                ))}
+              </select>
+              {creativoTipos.length > 1 && (
+                <select value={filterTipo} onChange={e => setFilterTipo(e.target.value)}
+                  className="h-8 px-3 text-xs border border-border rounded-lg bg-background text-foreground focus:outline-none">
+                  <option value="">Todos los tipos</option>
+                  {creativoTipos.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              )}
+              {(filterCampaign || filterTipo) && (
+                <button onClick={() => { setFilterCampaign(""); setFilterTipo("") }}
+                  className="h-8 px-3 text-xs border border-border rounded-lg text-muted-foreground hover:text-foreground transition-colors">
+                  Limpiar filtros
+                </button>
+              )}
+              {(filterCampaign || filterTipo) && (
+                <span className="h-8 flex items-center text-xs text-muted-foreground">
+                  {filteredCreativos.length} de {creativos.length}
+                </span>
+              )}
+            </div>
+          )}
+
+          {filteredCreativos.length === 0 ? (
             <div className="bg-card border border-border rounded-2xl p-10 text-center">
               <ImageIcon className="w-10 h-10 text-muted-foreground/20 mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">Sin piezas publicadas aún.</p>
+              <p className="text-sm text-muted-foreground">
+                {creativos.length === 0 ? "Sin piezas publicadas aún." : "Sin resultados para los filtros aplicados."}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {creativos.map(c => (
+              {filteredCreativos.map(c => (
                 <div key={c.id} className="bg-card border border-border rounded-2xl overflow-hidden hover:border-primary/30 transition-colors">
                   {/* Preview */}
-                  <div className="aspect-video bg-muted flex items-center justify-center overflow-hidden">
+                  <div className="aspect-video bg-muted flex items-center justify-center overflow-hidden relative">
                     {c.signedUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={c.signedUrl} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none" }} />
                     ) : (
                       <ImageIcon className="w-8 h-8 text-muted-foreground/30" />
+                    )}
+                    {c.adUrl && (
+                      <span className="absolute top-2 right-2 px-1.5 py-0.5 bg-primary/90 text-primary-foreground text-[10px] font-semibold rounded">
+                        En Meta
+                      </span>
                     )}
                   </div>
                   {/* Info */}
@@ -393,15 +476,32 @@ export default function EmpresaDashboardPage() {
               {meta.accountInsights && (
                 <>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <KpiCard label="Gasto total" value={fmtCurrency(meta.accountInsights.spend)} />
-                    <KpiCard label="Impresiones" value={fmtNumber(meta.accountInsights.impressions)} />
-                    <KpiCard label="Clicks" value={fmtNumber(meta.accountInsights.clicks)} />
-                    <KpiCard label="ROAS" value={extractROAS(meta.accountInsights.purchase_roas)} />
+                    <KpiCard label="Gasto total" value={fmtCurrency(meta.accountInsights.spend)}
+                      delta={pctDelta(meta.accountInsights.spend, prevMeta?.accountInsights?.spend)} />
+                    <KpiCard label="Impresiones" value={fmtNumber(meta.accountInsights.impressions)}
+                      delta={pctDelta(meta.accountInsights.impressions, prevMeta?.accountInsights?.impressions)} />
+                    <KpiCard label="Clicks" value={fmtNumber(meta.accountInsights.clicks)}
+                      delta={pctDelta(meta.accountInsights.clicks, prevMeta?.accountInsights?.clicks)} />
+                    <KpiCard label="ROAS" value={extractROAS(meta.accountInsights.purchase_roas)}
+                      delta={(() => {
+                        const curr = parseFloat(extractROAS(meta.accountInsights?.purchase_roas).replace("x", "")) || 0
+                        const prev = parseFloat(extractROAS(prevMeta?.accountInsights?.purchase_roas).replace("x", "")) || 0
+                        return prev > 0 ? Math.round((curr - prev) / prev * 100) : null
+                      })()} />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <KpiCard label="CTR" value={`${parseFloat(meta.accountInsights.ctr || "0").toFixed(2)}%`} />
-                    <KpiCard label="CPC promedio" value={fmtCurrency(meta.accountInsights.cpc)} />
+                    <KpiCard label="CTR" value={`${parseFloat(meta.accountInsights.ctr || "0").toFixed(2)}%`}
+                      delta={pctDelta(meta.accountInsights.ctr, prevMeta?.accountInsights?.ctr)} />
+                    <KpiCard label="CPC promedio" value={fmtCurrency(meta.accountInsights.cpc)}
+                      delta={pctDelta(meta.accountInsights.cpc, prevMeta?.accountInsights?.cpc) != null
+                        ? -(pctDelta(meta.accountInsights.cpc, prevMeta?.accountInsights?.cpc) ?? 0)
+                        : null} />
                   </div>
+                  {prevMeta?.accountInsights && (
+                    <p className="text-[11px] text-muted-foreground -mt-2">
+                      Comparando vs período anterior ({prevMeta.dateRange?.since ?? ""} → {prevMeta.dateRange?.until ?? ""})
+                    </p>
+                  )}
                 </>
               )}
 

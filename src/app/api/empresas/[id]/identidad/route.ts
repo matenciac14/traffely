@@ -29,7 +29,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!empresa) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
   const body = await req.json()
-  const { tono, publicoObjetivo, propuestasValor, palabrasProhibidas, instruccionesExtra, colores, tipografias } = body
+  const {
+    tono, publicoObjetivo, propuestasValor, palabrasProhibidas, instruccionesExtra, colores, tipografias,
+    contextoNegocio, reglasLegales, eventosKey,
+    industria, modeloNegocio, ticketPromedio, cicloVenta, temporadasClave, equipoCreativo, metaPrincipal,
+  } = body
+
+  const trim = (v: string | undefined) => (v !== undefined ? (v?.trim() || null) : undefined)
 
   const identidad = await db.empresaIdentidad.upsert({
     where: { empresaId: id },
@@ -42,15 +48,35 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       instruccionesExtra: instruccionesExtra?.trim() || null,
       colores: colores?.trim() || null,
       tipografias: tipografias?.trim() || null,
+      contextoNegocio: contextoNegocio?.trim() || null,
+      reglasLegales: reglasLegales?.trim() || null,
+      eventosKey: eventosKey?.trim() || null,
+      industria: industria?.trim() || null,
+      modeloNegocio: modeloNegocio?.trim() || null,
+      ticketPromedio: ticketPromedio?.trim() || null,
+      cicloVenta: cicloVenta?.trim() || null,
+      temporadasClave: temporadasClave?.trim() || null,
+      equipoCreativo: equipoCreativo?.trim() || null,
+      metaPrincipal: metaPrincipal?.trim() || null,
     },
     update: {
-      tono: tono !== undefined ? (tono?.trim() || null) : undefined,
-      publicoObjetivo: publicoObjetivo !== undefined ? (publicoObjetivo?.trim() || null) : undefined,
-      propuestasValor: propuestasValor !== undefined ? (propuestasValor?.trim() || null) : undefined,
-      palabrasProhibidas: palabrasProhibidas !== undefined ? (palabrasProhibidas?.trim() || null) : undefined,
-      instruccionesExtra: instruccionesExtra !== undefined ? (instruccionesExtra?.trim() || null) : undefined,
-      colores: colores !== undefined ? (colores?.trim() || null) : undefined,
-      tipografias: tipografias !== undefined ? (tipografias?.trim() || null) : undefined,
+      tono: trim(tono),
+      publicoObjetivo: trim(publicoObjetivo),
+      propuestasValor: trim(propuestasValor),
+      palabrasProhibidas: trim(palabrasProhibidas),
+      instruccionesExtra: trim(instruccionesExtra),
+      colores: trim(colores),
+      tipografias: trim(tipografias),
+      contextoNegocio: trim(contextoNegocio),
+      reglasLegales: trim(reglasLegales),
+      eventosKey: trim(eventosKey),
+      industria: trim(industria),
+      modeloNegocio: trim(modeloNegocio),
+      ticketPromedio: trim(ticketPromedio),
+      cicloVenta: trim(cicloVenta),
+      temporadasClave: trim(temporadasClave),
+      equipoCreativo: trim(equipoCreativo),
+      metaPrincipal: trim(metaPrincipal),
     },
   })
 

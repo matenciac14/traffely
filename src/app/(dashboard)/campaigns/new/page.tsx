@@ -8,22 +8,20 @@ import { useCampaignWizard } from "@/features/campaigns/store/campaign-wizard"
 import { useWizardDraft } from "@/features/campaigns/hooks/useWizardDraft"
 import Step1Identificacion from "@/features/campaigns/components/wizard/steps/Step1Identificacion"
 import Step2Brief from "@/features/campaigns/components/wizard/steps/Step2Brief"
-import Step3Oferta from "@/features/campaigns/components/wizard/steps/Step3Oferta"
-import Step4Modelos from "@/features/campaigns/components/wizard/steps/Step4Modelos"
-import Step5Estructura from "@/features/campaigns/components/wizard/steps/Step5Estructura"
+import Step3OfertaCatalogo from "@/features/campaigns/components/wizard/steps/Step3OfertaCatalogo"
+import Step4Conceptos from "@/features/campaigns/components/wizard/steps/Step3Conceptos"
+import Step5EstructuraCompleta from "@/features/campaigns/components/wizard/steps/Step4EstructuraCompleta"
 import Step6Presupuesto from "@/features/campaigns/components/wizard/steps/Step6Presupuesto"
-import Step7Equipo from "@/features/campaigns/components/wizard/steps/Step7Equipo"
 import StepPromptOutput from "@/features/campaigns/components/wizard/StepPromptOutput"
 import { cn } from "@/lib/utils"
 
 const STEPS = [
-  { n: 1, label: "Identificación", component: Step1Identificacion },
-  { n: 2, label: "Brief", component: Step2Brief },
-  { n: 3, label: "Oferta", component: Step3Oferta },
-  { n: 4, label: "Catálogo", component: Step4Modelos },
-  { n: 5, label: "Estructura", component: Step5Estructura },
+  { n: 1, label: "Empresa",     component: Step1Identificacion },
+  { n: 2, label: "Brief",       component: Step2Brief },
+  { n: 3, label: "Oferta",      component: Step3OfertaCatalogo },
+  { n: 4, label: "Conceptos",   component: Step4Conceptos },
+  { n: 5, label: "Estructura",  component: Step5EstructuraCompleta },
   { n: 6, label: "Presupuesto", component: Step6Presupuesto },
-  { n: 7, label: "Equipo", component: Step7Equipo },
 ]
 
 function WizardContent() {
@@ -51,13 +49,14 @@ function WizardContent() {
     if (!result.ok) {
       setError(result.error)
       setIsWarning(result.isWarning ?? false)
+      // Step 5 (Estructura) — trigger internal validation scroll
       if (currentStep === 5) {
         document.getElementById("step5-try-next")?.click()
       }
     } else {
       setError(null)
       setIsWarning(false)
-      if (currentStep === 7) setShowPrompt(true)
+      if (currentStep === 6) setShowPrompt(true)
     }
   }
 
@@ -178,7 +177,7 @@ function WizardContent() {
             onClick={handleNext}
             className="h-9 px-5 text-sm font-semibold bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
           >
-            {currentStep === 7
+            {currentStep === 6
               ? "Generar prompt"
               : isWarning && !_avisoReservaMostrado
                 ? "Continuar de todas formas"

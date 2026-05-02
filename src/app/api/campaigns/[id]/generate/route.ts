@@ -1,8 +1,10 @@
 import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db/prisma"
-import { getAiClient, AI_MODEL, SYSTEM_PROMPT } from "@/lib/ai/client"
+import { getAiClient, AI_MODEL } from "@/lib/ai/client"
+import { getActiveSystemPrompt } from "@/lib/ai/system-prompt"
 import { rateLimit } from "@/lib/ratelimit"
 import { decrypt } from "@/lib/utils/crypto"
+import { logger } from "@/lib/logger"
 
 interface EmpresaIdentidad {
   tono: string | null
@@ -10,24 +12,60 @@ interface EmpresaIdentidad {
   propuestasValor: string | null
   palabrasProhibidas: string | null
   instruccionesExtra: string | null
+  contextoNegocio: string | null
+  reglasLegales: string | null
+  eventosKey: string | null
+  industria: string | null
+  modeloNegocio: string | null
+  ticketPromedio: string | null
+  cicloVenta: string | null
+  temporadasClave: string | null
+  equipoCreativo: string | null
+  metaPrincipal: string | null
 }
 
 function buildSystemPrompt(
+  basePrompt: string,
   aiProfile: Record<string, string> | null,
-  empresaIdentidad?: EmpresaIdentidad | null
+  empresaIdentidad?: EmpresaIdentidad | null,
+  campaignOverrides?: { tono?: string; publicoObjetivo?: string }
 ): string {
-  const sections: string[] = [SYSTEM_PROMPT]
+  const sections: string[] = [basePrompt]
 
   // Identidad de empresa (Fase 12 — prioridad sobre aiProfile del workspace)
   if (empresaIdentidad) {
-    if (empresaIdentidad.tono?.trim())
-      sections.push(`\n## TONO Y VOZ DE LA MARCA\n${empresaIdentidad.tono.trim()}`)
-    if (empresaIdentidad.publicoObjetivo?.trim())
-      sections.push(`\n## PÚBLICO OBJETIVO DEL CLIENTE\n${empresaIdentidad.publicoObjetivo.trim()}`)
+    if (empresaIdentidad.contextoNegocio?.trim())
+      sections.push(`\n## CONTEXTO DEL NEGOCIO\n${empresaIdentidad.contextoNegocio.trim()}`)
+
+    // Tono: brief de campaña gana sobre identidad de empresa (permite tono disruptivo por campaña)
+    const tonoFinal = campaignOverrides?.tono?.trim() || empresaIdentidad.tono
+    if (tonoFinal?.trim())
+      sections.push(`\n## TONO Y VOZ DE LA MARCA\n${tonoFinal.trim()}`)
+
+    // Público: brief de campaña puede segmentar diferente al público habitual de la marca
+    const publicoFinal = campaignOverrides?.publicoObjetivo?.trim() || empresaIdentidad.publicoObjetivo
+    if (publicoFinal?.trim())
+      sections.push(`\n## PÚBLICO OBJETIVO DEL CLIENTE\n${publicoFinal.trim()}`)
     if (empresaIdentidad.propuestasValor?.trim())
       sections.push(`\n## PROPUESTAS DE VALOR FIJAS (incluir siempre que aplique)\n${empresaIdentidad.propuestasValor.trim()}`)
     if (empresaIdentidad.palabrasProhibidas?.trim())
       sections.push(`\n## PALABRAS/FRASES PROHIBIDAS\n${empresaIdentidad.palabrasProhibidas.trim()}`)
+    if (empresaIdentidad.reglasLegales?.trim())
+      sections.push(`\n## REGLAS LEGALES Y RESTRICCIONES DE LA INDUSTRIA\n${empresaIdentidad.reglasLegales.trim()}`)
+    if (empresaIdentidad.eventosKey?.trim())
+      sections.push(`\n## EVENTOS Y FECHAS CLAVE DE LA EMPRESA\n${empresaIdentidad.eventosKey.trim()}`)
+    if (empresaIdentidad.industria?.trim())
+      sections.push(`\n## INDUSTRIA Y CATEGORÍA\n${empresaIdentidad.industria.trim()}`)
+    if (empresaIdentidad.modeloNegocio?.trim())
+      sections.push(`\n## MODELO DE NEGOCIO\n${empresaIdentidad.modeloNegocio.trim()}`)
+    if (empresaIdentidad.ticketPromedio?.trim())
+      sections.push(`\n## TICKET PROMEDIO\n${empresaIdentidad.ticketPromedio.trim()}`)
+    if (empresaIdentidad.cicloVenta?.trim())
+      sections.push(`\n## CICLO DE VENTA\n${empresaIdentidad.cicloVenta.trim()}`)
+    if (empresaIdentidad.temporadasClave?.trim())
+      sections.push(`\n## TEMPORADAS Y MOMENTOS CLAVE\n${empresaIdentidad.temporadasClave.trim()}`)
+    if (empresaIdentidad.metaPrincipal?.trim())
+      sections.push(`\n## META PRINCIPAL DE CAMPAÑAS\n${empresaIdentidad.metaPrincipal.trim()}`)
     if (empresaIdentidad.instruccionesExtra?.trim())
       sections.push(`\n## INSTRUCCIONES ADICIONALES\n${empresaIdentidad.instruccionesExtra.trim()}`)
   } else if (aiProfile) {
@@ -80,8 +118,13 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     db.campaign.findUnique({
       where: { id, workspaceId: session.user.workspaceId },
       select: {
-        id: true, promptMaestro: true, empresaId: true,
+        id: true, promptMaestro: true, empresaId: true, brief: true,
         empresa: { include: { identidad: true } },
+        conceptos: {
+          where: { isSelected: true },
+          select: { nombre: true, hipotesis: true, anguloMensajeria: true, frameworkCopy: true, direccionVisual: true },
+          orderBy: { orden: "asc" },
+        },
       },
     }),
     db.workspace.findUnique({
@@ -94,8 +137,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     return new Response(JSON.stringify({ error: "No hay prompt maestro generado" }), { status: 400 })
   }
 
-  // Rate limit: 10 generaciones IA por workspace cada 24h
-  const rl = await rateLimit(`ai_gen:${session.user.workspaceId}`, 10)
+  // Rate limit: 3 brief completos por workspace cada 24h (call pesado — genera copy de todas las piezas)
+  const rl = await rateLimit(`ai_brief:${session.user.workspaceId}`, 3)
   if (!rl.allowed) {
     const resetIn = Math.ceil((rl.resetAt - Date.now()) / 1000 / 60)
     return new Response(
@@ -124,12 +167,29 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const aiClient = getAiClient(resolvedKey)
   const aiProfile = workspace?.aiProfile as Record<string, string> | null
   const empresaIdentidad = campaign.empresa?.identidad ?? null
-  const systemPrompt = buildSystemPrompt(aiProfile, empresaIdentidad)
+  // Extraer overrides del brief de campaña: ganan sobre EmpresaIdentidad para permitir tono disruptivo
+  const briefData = campaign.brief as Record<string, string> | null
+  const campaignOverrides = {
+    tono: briefData?.tonoYestilo || undefined,
+    publicoObjetivo: briefData?.publicoObjetivo || undefined,
+  }
+  const basePrompt = await getActiveSystemPrompt()
+  let systemPrompt = buildSystemPrompt(basePrompt, aiProfile, empresaIdentidad, campaignOverrides)
+
+  // Inyectar conceptos creativos seleccionados en el system prompt (fuente de verdad: DB)
+  const selectedConceptos = campaign.conceptos ?? []
+  if (selectedConceptos.length > 0) {
+    const conceptosBlock = `\n## CONCEPTOS CREATIVOS SELECCIONADOS (guían TODA la campaña)\nCada pieza del brief DEBE alinearse con alguno de estos conceptos:\n${selectedConceptos.map((c, i) =>
+      `${i + 1}. **${c.nombre}**: ${c.hipotesis ?? ""} | Ángulo: ${c.anguloMensajeria ?? ""} | Framework: ${c.frameworkCopy ?? ""} | Visual: ${c.direccionVisual ?? ""}`
+    ).join("\n")}`
+    systemPrompt += conceptosBlock
+  }
+
   const workspaceId = session.user.workspaceId
 
   const stream = aiClient.messages.stream({
     model: AI_MODEL,
-    max_tokens: 16000,
+    max_tokens: 8000,
     system: systemPrompt,
     messages: [{ role: "user", content: campaign.promptMaestro }],
   })
@@ -163,6 +223,64 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
           data: { briefGenerado: fullText, briefGeneradoAt: new Date() },
         })
 
+        // Auto-populate Pieces from brief JSON (pipeline unification)
+        try {
+          const jsonMatch = fullText.match(/\{[\s\S]*\}/)
+          if (jsonMatch) {
+            const briefData = JSON.parse(jsonMatch[0]) as {
+              piezas?: Array<{
+                primaryText?: string
+                headline?: string
+                descripcion?: string
+                varianteB_primaryText?: string
+                varianteB_headline?: string
+                guionResumen?: string
+                imageBrief?: string
+              }>
+            }
+            if (Array.isArray(briefData.piezas) && briefData.piezas.length > 0) {
+              // Load pieces in creation order (adSet.orden → piece.orden)
+              const adSets = await db.adSet.findMany({
+                where: { campaignId: id },
+                orderBy: { orden: "asc" },
+                include: { pieces: { orderBy: { orden: "asc" }, select: { id: true } } },
+              })
+              const dbPieces = adSets.flatMap((as) => as.pieces)
+
+              const now = new Date()
+              for (let i = 0; i < Math.min(dbPieces.length, briefData.piezas.length); i++) {
+                const p = briefData.piezas[i]
+                const varA = [
+                  p.primaryText ? `**Primary Text**: ${p.primaryText}` : null,
+                  p.headline ? `**Headline**: ${p.headline}` : null,
+                  p.descripcion ? `**Descripción**: ${p.descripcion}` : null,
+                ].filter(Boolean).join("\n")
+                const varB = p.varianteB_primaryText ? [
+                  `**Primary Text**: ${p.varianteB_primaryText}`,
+                  p.varianteB_headline ? `**Headline**: ${p.varianteB_headline}` : null,
+                ].filter(Boolean).join("\n") : null
+
+                const copyGenerado = [
+                  varA ? `### VARIANTE A\n${varA}` : null,
+                  varB ? `### VARIANTE B\n${varB}` : null,
+                ].filter(Boolean).join("\n\n") || null
+
+                await db.piece.update({
+                  where: { id: dbPieces[i].id },
+                  data: {
+                    guionGenerado: p.guionResumen ?? null,
+                    copyGenerado,
+                    imageBriefGenerado: p.imageBrief ?? null,
+                    aiGeneratedAt: now,
+                  },
+                })
+              }
+            }
+          }
+        } catch (parseErr) {
+          logger.error("generate/auto-populate-pieces", parseErr, { campaignId: id })
+        }
+
         // Track cost ($5/1M input, $25/1M output — Opus 4.6)
         const costUsd = (inputTokens * 5 + outputTokens * 25) / 1_000_000
         await db.aiUsage.create({
@@ -184,10 +302,14 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
         if (isMissingKey || err instanceof Error && err.message.includes("authentication")) {
           const mockReadable = mockStream(campaign.promptMaestro ?? "")
           const reader = mockReadable.getReader()
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-            controller.enqueue(value)
+          try {
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+              controller.enqueue(value)
+            }
+          } finally {
+            reader.cancel()
           }
         } else {
           const msg = err instanceof Error ? err.message : "Error generando"
