@@ -1,7 +1,5 @@
 import { Resend } from "resend"
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 const FROM = "Traffely <noreply@traffely.com>"
 const APP_URL = process.env.NEXTAUTH_URL ?? "https://traffely.com"
 
@@ -100,6 +98,11 @@ export async function sendInviteEmail(params: InviteEmailParams) {
 </body>
 </html>`
 
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("[email] RESEND_API_KEY no configurada — email de invitación omitido")
+    return
+  }
+  const resend = new Resend(process.env.RESEND_API_KEY)
   await resend.emails.send({
     from: FROM,
     to,
