@@ -1,3 +1,8 @@
+"use client"
+
+import { useState } from "react"
+import { ChevronDownIcon, ChevronUpIcon } from "lucide-react"
+
 const ROADMAP: { fase: string; status: "done" | "in-progress" | "pending"; items: { label: string; done: boolean }[] }[] = [
   {
     fase: "Fase 1 — MVP Auth + Admin SaaS",
@@ -16,7 +21,7 @@ const ROADMAP: { fase: string; status: "done" | "in-progress" | "pending"; items
     fase: "Fase 2 — Wizard de campañas",
     status: "done" as const,
     items: [
-      { label: "Wizard 7 pasos con stepper horizontal", done: true },
+      { label: "Wizard 8 pasos con stepper horizontal (Fase 26 agregó paso Conceptos)", done: true },
       { label: "Zustand store con validación por paso", done: true },
       { label: "Step 1–7 completos (brief, oferta, modelos, estructura, presupuesto, equipo)", done: true },
       { label: "Prompt maestro generado en servidor", done: true },
@@ -82,11 +87,11 @@ const ROADMAP: { fase: string; status: "done" | "in-progress" | "pending"; items
       { label: "Índices de DB (@@index en workspaceId, campaignId, assigneeId)", done: true },
       { label: "Fix as any en auth config (role/workspaceId tipados)", done: true },
       { label: "Zod en todas las API routes (ai-profile, admin/workspaces, meta)", done: true },
-      { label: "Rate limiting Redis (Upstash) para producción", done: false },
-      { label: "Rate limiting en registro (anti-spam)", done: false },
+      { label: "Rate limiting Redis (Upstash) para producción", done: true },
+      { label: "Rate limiting en registro (anti-spam)", done: true },
       { label: "Verificación de email al crear usuario", done: false },
       { label: "Google OAuth con mapeo de usuario a workspace", done: false },
-      { label: "Onboarding self-serve (registro OWNER)", done: false },
+      { label: "Onboarding self-serve (registro OWNER)", done: true },
       { label: "Notificaciones por email (invitación, cambio estado)", done: false },
       { label: "Sentry o similar para error tracking en producción", done: false },
       { label: "Deploy Vercel + Neon producción (traffely.com live)", done: true },
@@ -190,7 +195,7 @@ const ROADMAP: { fase: string; status: "done" | "in-progress" | "pending"; items
       { label: "Modelo Empresa en Prisma: id, workspaceId, nombre, logo, industria, website, descripcion, isActive", done: true },
       { label: "Modelo EmpresaIdentidad: tono, publicoObjetivo, propuestasValor, palabrasProhibidas, instruccionesExtra, colores, tipografias", done: true },
       { label: "Migrar Campaign: agregar empresaId (FK opcional → campañas existentes sin empresa)", done: true },
-      { label: "Migrar ShopifyIntegration: mover de workspaceId → empresaId (pendiente Fase 12 avanzada)", done: false },
+      { label: "Migrar ShopifyIntegration: mover de workspaceId → empresaId [BLOQUEADO — Fase 10 en hold]", done: false },
       { label: "Migrar aiProfile de Workspace → EmpresaIdentidad (legacy queda como fallback)", done: true },
       { label: "Campo empresasLimit en Workspace (sin enforcement aún — Fase 14)", done: false },
       { label: "GET /api/empresas → listar empresas del workspace", done: true },
@@ -199,33 +204,51 @@ const ROADMAP: { fase: string; status: "done" | "in-progress" | "pending"; items
       { label: "PATCH /api/empresas/[id] → editar datos generales inline", done: true },
       { label: "PATCH /api/empresas/[id]/identidad → upsert identidad de marca", done: true },
       { label: "DELETE /api/empresas/[id] → soft delete (isActive: false)", done: true },
-      { label: "Actualizar /api/integrations/shopify/* para operar por empresaId", done: false },
+      { label: "Actualizar /api/integrations/shopify/* para operar por empresaId [BLOQUEADO — Fase 10 en hold]", done: false },
       { label: "Página /empresas: listado con tarjetas, progress identidad IA, campañas", done: true },
       { label: "Página /empresas/nueva: wizard 2 pasos (datos generales + identidad con 'completar después')", done: true },
       { label: "Página /empresas/[id]: campos editables inline (click para editar), progress identidad IA", done: true },
       { label: "Empresas en sidebar (nav CLIENT_NAV)", done: true },
-      { label: "Settings: mover tab 'Shopify' de workspace → dentro de /empresas/[id]", done: false },
+      { label: "Settings: mover tab 'Shopify' de workspace → dentro de /empresas/[id] [BLOQUEADO — Fase 10 en hold]", done: false },
       { label: "Step 1 wizard: selector visual de empresa con tarjetas (carga desde API)", done: true },
       { label: "Al seleccionar empresa: pre-cargar tono, público, propuestasValor en el brief", done: true },
       { label: "Guardar empresaId en Campaign al autosave y al completar wizard", done: true },
       { label: "Generate brief: usa EmpresaIdentidad si tiene empresaId, fallback a aiProfile del workspace", done: true },
-      { label: "ShopifyProductPicker: operar con empresaId en lugar de workspaceId", done: false },
-      { label: "Step 3 y Step 4: picker carga productos de la empresa seleccionada en Step 1", done: false },
+      { label: "ShopifyProductPicker: operar con empresaId en lugar de workspaceId [BLOQUEADO — Fase 10 en hold]", done: false },
+      { label: "Step 3 y Step 4: picker carga productos Shopify de la empresa seleccionada [BLOQUEADO — Fase 10 en hold]", done: false },
+      // Catálogo de productos (no-Shopify)
+      { label: "[DB] Modelo Producto: id, empresaId, nombre, precioActual, precioAntes, descripcion, sku, isActive", done: true },
+      { label: "[API] GET /api/empresas/[id]/productos → listar productos activos de la empresa", done: true },
+      { label: "[API] POST /api/empresas/[id]/productos → crear producto", done: true },
+      { label: "[API] PATCH /api/empresas/[id]/productos/[pid] → editar producto", done: true },
+      { label: "[API] DELETE /api/empresas/[id]/productos/[pid] → eliminar producto", done: true },
+      { label: "[UI] Sección 'Catálogo' en /empresas/[id]: agregar y eliminar productos", done: true },
+      { label: "[UI] Wizard Step 4: carga catálogo de la empresa seleccionada con checkboxes", done: true },
+      { label: "[UI] Wizard Step 4: si Shopify conectado → muestra productos Shopify; si no → muestra catálogo interno", done: true },
+      { label: "[UI] Wizard Step 4: precios pre-rellenados desde catálogo, ajustables por campaña", done: true },
+      // Fase 22 — rename modelos → productos (restante)
+      { label: "[DB] schema.prisma: Campaign.modelos → productos con @map('modelos') (sin migración)", done: true },
+      { label: "[API] campaigns routes: .modelos → .productos en queries Prisma", done: true },
+      { label: "[UI] ShopifyProductPicker: mode='modelos' → mode='productos'", done: true },
     ],
   },
 
   {
     fase: "Fase 13 — Wizard refactorizado (AI-First con identidad de empresa)",
-    status: "pending" as const,
+    status: "done" as const,
     items: [
-      { label: "Reducir wizard a 5 pasos: Empresa + Brief rápido + Oferta + Estructura + Revisión", done: false },
-      { label: "Step 1 nuevo: selección de empresa (carga identidad) — ya no pide datos de marca en el wizard", done: false },
-      { label: "Step 2 nuevo: Brief campaña ligero — solo objetivo, contexto, fechas (tono/CTA vienen de empresa)", done: false },
+      { label: "Step de Equipo eliminado: wizard pasa de 8 a 7 pasos", done: true },
+      { label: "Trigger 'Generar prompt' movido de step 8 → step 7 (Presupuesto)", done: true },
+      { label: "CampaignTeamAssign: asignación de creativos desde detalle de campaña (reemplaza Step 8 eliminado)", done: true },
       { label: "Brief chips ya disponibles para objetivo, tono, CTA en Step 2", done: true },
       { label: "Público objetivo con chips de edad/género en Step 2", done: true },
-      { label: "Step de Equipo: eliminar (se asigna desde el board después)", done: false },
-      { label: "Prompt maestro: combinar identidad empresa + brief campaña → output más preciso", done: false },
-      { label: "Opción 'Completar después' en brief opcional (avanzar sin brief completo, IA genera con lo que hay)", done: false },
+      { label: "Reducir wizard a 5 pasos: Empresa + Brief + Oferta & Catálogo + Estructura + Presupuesto", done: true },
+      { label: "Step 3 fusiona Oferta + Catálogo (misma pantalla, sección separada)", done: true },
+      { label: "Step 4 fusiona Conceptos (opcional, colapsable) + Estructura de campañas", done: true },
+      { label: "Validators remapeados de 8 casos a 5 (case 3 = oferta+catálogo, case 4 = estructura, case 5 = presupuesto)", done: true },
+      { label: "Step 2 modo ligero: cuando hay empresa con identidad → muestra banner + solo campos campaign-specific + overrides colapsables", done: true },
+      { label: "Prompt maestro: cuando hay empresaId, señaliza que identidad está en system prompt, solo incluye overrides de campaña", done: true },
+      { label: "Opción 'Completar después': nota visual clara + todos los campos opcionales en ambos modos", done: true },
     ],
   },
 
@@ -275,40 +298,43 @@ const ROADMAP: { fase: string; status: "done" | "in-progress" | "pending"; items
 
   {
     fase: "Fase 16 — Brief nativo en plataforma (reemplaza texto plano / Word)",
-    status: "pending" as const,
+    status: "done" as const,
     items: [
-      { label: "[DISEÑO] Definir JSON schema de secciones del brief: resumen, público, oferta, piezas, plan", done: false },
-      { label: "[DISEÑO] Flujo: wizard → Claude genera secciones JSON → persiste en Campaign.briefData", done: false },
-      { label: "[DB] Campo briefData Json? en Campaign (secciones parseadas del brief)", done: false },
-      { label: "[API] Cambiar promptMaestro para instruir a Claude a devolver JSON estructurado por secciones", done: false },
-      { label: "[API] Parser SSE: acumular → extraer JSON → guardar briefData al finalizar stream", done: false },
-      { label: "[UI] Vista brief en /campaigns/[id]: secciones con diseño nativo (no <pre> de texto)", done: false },
-      { label: "[UI] Sección 'Resumen ejecutivo': tabla con campaña, empresa, objetivo, presupuesto", done: false },
-      { label: "[UI] Sección 'Guiones y copys': acordeón por pieza con guión formateado + copy del ad", done: false },
-      { label: "[UI] Sección 'Plan de trabajo': tabla piezas con prioridad sugerida y timeline estimado", done: false },
-      { label: "[IA] Segundo call post-brief: genera plan de trabajo JSON (pieza → prioridad → fecha sugerida)", done: false },
-      { label: "[IA] Plan de trabajo actualiza dueDate y priority en Piece con confirmación del OWNER", done: false },
-      { label: "[UI] Modal preview del plan antes de aplicar: tabla editable → confirmar → guarda en DB", done: false },
-      { label: "[UI] Exportar brief a PDF desde browser (window.print + CSS print styles)", done: false },
+      { label: "[DISEÑO] Definir JSON schema del brief: resumen (objetivo, insight, estrategia, totales) + piezas[]", done: true },
+      { label: "[API] Eliminar instrucciones Word/docx del prompt maestro (200+ líneas legacy)", done: true },
+      { label: "[API] Instruir a Claude a devolver JSON estructurado por pieza (hook, framework, primaryText, guionResumen, justificación)", done: true },
+      { label: "[API] Parser SSE: acumular stream completo → parsear JSON al finalizar → persistir en briefGenerado", done: true },
+      { label: "[UI] CampaignGenerateSection: spinner mientras genera, cards estructuradas al terminar", done: true },
+      { label: "[UI] Tarjeta resumen estratégico: total piezas/copys, objetivo, insight, estrategia creativa", done: true },
+      { label: "[UI] Acordeón por pieza: hook apertura, guión/brief visual, primary text copiable, headline con conteo de chars, justificación", done: true },
+      { label: "[UI] Backward compat: brief anterior (texto plano) renderiza como Markdown con botón 'Regenerar con nuevo formato'", done: true },
+      { label: "[UI] Exportar brief como JSON", done: true },
+      { label: "[IA] Auto-populate: brief JSON → guion/copy/imageBrief copiados a cada Piece al generar (match por índice)", done: true },
+      { label: "[UI] Sección 'Plan de trabajo': tabla piezas con prioridad sugerida y días estimados", done: true },
+      { label: "[IA] POST /api/campaigns/[id]/work-plan → segundo call Claude: priority + days + justificación por pieza", done: true },
+      { label: "[IA] PATCH action apply-work-plan: aplica priority + dueDate a todas las piezas con confirmación del OWNER", done: true },
+      { label: "[UI] Tabla editable con confirm antes de aplicar (CampaignWorkPlan component)", done: true },
+      { label: "[UI] Exportar brief a PDF desde browser (window.print + CSS print styles)", done: true },
       { label: "[DB] BriefVersion: guardar versiones anteriores al regenerar brief", done: false },
     ],
   },
 
   {
     fase: "Fase 17 — Board Pro (inspirado en ClickUp, adaptado a producción creativa)",
-    status: "pending" as const,
+    status: "in-progress" as const,
     items: [
       // Board básico
-      { label: "[BOARD] Prioridad visible en PieceCard: badge URGENTE/ALTA/MEDIA/BAJA con colores", done: false },
-      { label: "[BOARD] Due date visible en PieceCard: badge con días restantes / vencida (rojo)", done: false },
+      { label: "[BOARD] Prioridad visible en PieceCard: badge URGENTE/ALTA/MEDIA/BAJA con colores", done: true },
+      { label: "[BOARD] Due date visible en PieceCard: badge con días restantes / vencida (rojo)", done: true },
       { label: "[BOARD] Filtro por prioridad en BoardKanban (ya existe el campo en DB)", done: false },
       { label: "[BOARD] Activity feed por pieza: historial de cambios de estado, asignaciones y comentarios en drawer", done: false },
       // Assignees múltiples
       { label: "[BOARD] Multiple assignees por pieza: campo assignees String[] en Piece + UI multi-select", done: false },
       { label: "[BOARD] Assign comments: marcar comentario como acción pendiente → notifica al asignado", done: false },
       // Workload view
-      { label: "[WORKLOAD] Vista 'Carga del equipo': piezas agrupadas por creativo asignado", done: false },
-      { label: "[WORKLOAD] Indicador de carga: conteo de piezas activas por miembro con semáforo visual", done: false },
+      { label: "[WORKLOAD] Vista 'Carga del equipo': piezas agrupadas por creativo asignado con semáforo Alta/Media/Baja", done: true },
+      { label: "[WORKLOAD] Toggle Kanban | Carga en header del board (icono kanban / icono users)", done: true },
+      { label: "[WORKLOAD] Indicador de piezas vencidas por miembro en la workload view", done: true },
       { label: "[WORKLOAD] Filtro rápido 'mis piezas' vs 'todo el equipo' en board y workload", done: false },
       // Timeline / Gantt ligero
       { label: "[TIMELINE] Vista timeline de campaña: piezas en eje de tiempo por dueDate de publicación", done: false },
@@ -351,7 +377,7 @@ const ROADMAP: { fase: string; status: "done" | "in-progress" | "pending"; items
 
   {
     fase: "Fase 19 — Dashboard de métricas + Meta Ads por empresa",
-    status: "in-progress" as const,
+    status: "done" as const,
     items: [
       // ── Meta por empresa (prerrequisito del dashboard) ──
       { label: "[DB] Campos en Empresa: metaAdAccountId, metaAccessToken (AES-256-GCM), metaTokenExpiresAt, metaEnabled", done: true },
@@ -384,13 +410,14 @@ const ROADMAP: { fase: string; status: "done" | "in-progress" | "pending"; items
       { label: "[AUDIENCE] Top 10 países: tabla con Spend, Impressions, Clicks, ROAS", done: true },
       // ── Tab Creativos ──
       { label: "[CREATIVE] Grid de piezas PUBLICADO: preview archivo S3, tipo, asignee, campaña", done: true },
-      { label: "[CREATIVE] Badge performance Meta: Top Performer (ROAS >4x), Promedio (2-4x), Bajo rendimiento (<2x)", done: false },
-      { label: "[CREATIVE] Métricas por creativo (si Meta conectado): Spend, Impressions, CTR, ROAS", done: false },
-      { label: "[CREATIVE] Filtros: por campaña, por performance tier, por tipo de pieza", done: false },
+      { label: "[CREATIVE] Filtros por campaña y tipo de pieza + contador de resultados", done: true },
+      { label: "[CREATIVE] Badge 'En Meta' en preview cuando adUrl presente", done: true },
+      { label: "[CREATIVE] Badge performance por creativo (requiere metaCampaignId en schema — pendiente Fase 28)", done: false },
+      { label: "[CREATIVE] Métricas individuales por creativo desde Meta (requiere metaCampaignId — pendiente Fase 28)", done: false },
       // ── Tab Analytics ──
       { label: "[ANALYTICS] Gráfico dual-axis: Daily Spend vs ROAS (Recharts)", done: true },
       { label: "[ANALYTICS] Gráfico barras ROAS por campaña con umbral de performance coloreado", done: true },
-      { label: "[ANALYTICS] Comparativa período actual vs período anterior para KPIs principales", done: false },
+      { label: "[ANALYTICS] Comparativa período actual vs período anterior — KPIs Meta con delta ▲▼%", done: true },
       // ── Export ──
       { label: "[EXPORT] Exportar métricas de campaña a CSV para reportes al cliente", done: true },
     ],
@@ -424,12 +451,283 @@ const ROADMAP: { fase: string; status: "done" | "in-progress" | "pending"; items
       { label: "[CONTEXTO] Comando /pieza [nombre] → inserta link clickeable a Piece con preview inline", done: false },
     ],
   },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ARQUITECTURA AI-FIRST — descoupling del prompt quemado
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  {
+    fase: "Fase 21 — AI Architecture: identidad de empresa como único contexto",
+    status: "in-progress" as const,
+    items: [
+      // Desacoplar SYSTEM_PROMPT
+      { label: "[AI] SYSTEM_PROMPT: verificar que es 100% genérico sin referencia a industria, país ni cliente específico", done: true },
+      { label: "[AI] Eliminar de prompt-generator.ts: contexto Primatón hardcodeado, reglas legales de calzado/fashion, '24-72h ciudades principales'", done: true },
+      { label: "[AI] Registros de voz: remover sesgo colombiano del prompt base — queda genérico, el tono específico va en EmpresaIdentidad.tono", done: true },
+      // Expandir EmpresaIdentidad
+      { label: "[DB] EmpresaIdentidad: campo 'contextoNegocio' (cómo funciona el negocio, ciclo de compra, diferenciadores)", done: true },
+      { label: "[DB] EmpresaIdentidad: campo 'reglasLegales' (prohibiciones y cuidados específicos de la industria)", done: true },
+      { label: "[DB] EmpresaIdentidad: campo 'eventosKey' (fechas comerciales relevantes para la empresa)", done: true },
+      { label: "[UI] Formulario identidad empresa: sección 'Contexto avanzado' con contextoNegocio, reglasLegales, eventosKey", done: true },
+      { label: "[API] identidad route PATCH: acepta y persiste los 3 campos nuevos", done: true },
+      // Buildear prompt dinámicamente desde identidad
+      { label: "[AI] campaigns/generate: sistema prompt incluye contextoNegocio, reglasLegales, eventosKey de la empresa", done: true },
+      { label: "[AI] pieces/generate: sistema prompt incluye los mismos 3 campos nuevos", done: true },
+      { label: "[AI] Validar con empresa de industria diferente (no calzado): el brief generado debe ser contextualmente correcto", done: true },
+      // Preparación para generación de assets
+      { label: "[AI] Definir estructura de prompt por pieza para generación de imágenes: objeto con escena, estilo, texto en imagen, dimensiones", done: false },
+      { label: "[AI] Definir estructura de prompt por pieza para generación de video: storyboard, duración por escena, voz en off, música", done: false },
+      { label: "[API] POST /api/pieces/[id]/generate-asset → placeholder: recibe tipo (image/video) + devuelve estructura del prompt listo para enviar a Replicate/Runway", done: false },
+      { label: "[UI] Drawer de pieza: sección 'Generar asset' con selector imagen/video (deshabilitado hasta integrar proveedor)", done: false },
+      // Proveedores de generación
+      { label: "[AI] Integrar Replicate (imagen): FLUX o SDXL para generación de imágenes de anuncios", done: false },
+      { label: "[AI] Integrar Runway o Kling (video): generación de videos cortos para Reels/Stories", done: false },
+      { label: "[AI] Pipeline: guionGenerado → prompt imagen/video → asset generado → subir a S3 → asignar a Piece", done: false },
+    ],
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ARQUITECTURA AGNÓSTICA — producto para cualquier industria/agencia/marca
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  {
+    fase: "Fase 22 — Rename modelos → productos (industria agnóstico)",
+    status: "done" as const,
+    items: [
+      { label: "[STORE] Renombrar modelosCustom → productosCustom en campaign-wizard.ts", done: true },
+      { label: "[STORE] Renombrar modelosSeleccionados → productosSeleccionados en campaign-wizard.ts", done: true },
+      { label: "[STORE] Renombrar preciosModelos → preciosProductos en campaign-wizard.ts", done: true },
+      { label: "[STORE] Renombrar modelosDescripcion → productosDescripcion en campaign-wizard.ts", done: true },
+      { label: "[TYPES] Actualizar CampaignWizardState con los nuevos nombres de campo", done: true },
+      { label: "[STORE] Eliminar import de MODELOS_BASE de campaign-wizard.ts", done: true },
+      { label: "[STORE] Actualizar getAllModelos() → getAllProductos()", done: true },
+      { label: "[HOOK] useWizardDraft: actualizar mapeo campaignToWizardState para nuevos nombres", done: true },
+      { label: "[UI] Step4: labels 'Modelos' → 'Productos' y 'modelo' → 'producto' en todas las strings", done: true },
+      { label: "[UI] Step5: referencias a modelo en piezas actualizadas a producto", done: true },
+      { label: "[UI] Roadmap y CLAUDE.md: documentar convención renombrada", done: true },
+      { label: "[API] prompt-generator.ts: referencias a 'modelos' → 'productos' en el prompt maestro", done: true },
+      { label: "[DATA] campaign-data.ts: eliminar MODELOS_BASE (array de calzado hardcodeado)", done: true },
+    ],
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // INTEGRACIÓN CLAUDE-ADS — profesionalización del motor creativo
+  // Inspirado en: github.com/AgriciDaniel/claude-ads
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  {
+    fase: "Fase 25 — Generación de Copy Profesional (claude-ads level)",
+    status: "done" as const,
+    items: [
+      // Piece generate — mejoras de prompt (sin schema change)
+      { label: "[AI] Piece generate: aplicar framework declarado (AIDA/PAS/BAB/4P/FAB/Storytelling/Star-Story)", done: true },
+      { label: "[AI] Piece generate: char limits por plataforma (Primary Text 125 chars, Headline 40, Descripción 30)", done: true },
+      { label: "[AI] Piece generate: generar Variante A + Variante B de primary text y headline para A/B testing", done: true },
+      { label: "[AI] Piece generate: Image Generation Brief estructurado (composición, colores hex, safe zones, dimensiones)", done: true },
+      { label: "[AI] Piece generate: hook word en primeras 3 palabras del headline (regla de calidad)", done: true },
+      // Campaign generate — mejoras de prompt
+      { label: "[AI] Campaign generate: agregar imageBrief por pieza en JSON output (safe zones + prompt de imagen)", done: true },
+      { label: "[AI] Campaign generate: agregar varianteB_primaryText y varianteB_headline por pieza en JSON", done: true },
+      { label: "[AI] Campaign generate: remover sesgo colombiano del prompt ('Tono colombiano')", done: true },
+      { label: "[AI] Campaign generate: agregar Star-Story-Solution como framework disponible", done: true },
+      // DB + UI (requieren trabajo adicional)
+      { label: "[DB] Piece: campo imageBriefGenerado (Text?) para guardar brief de asset estructurado", done: true },
+      { label: "[UI] PieceDrawer: sección 'Brief de Asset' con imageBriefGenerado copiable y listo para Replicate/Runway", done: true },
+      { label: "[UI] PieceDrawer: mostrar Variante A y Variante B de copy con switch para elegir cual publicar", done: true },
+      { label: "[UI] CampaignGenerateSection: mostrar imageBrief por pieza en el acordeón", done: true },
+    ],
+  },
+
+  {
+    fase: "Fase 26 — Pipeline de Conceptos Creativos (pre-estructuración)",
+    status: "done" as const,
+    items: [
+      { label: "[DB] Modelo Concepto: id, campaignId, nombre, hipotesis, anguloMensajeria, frameworkCopy, direccionVisual, isSelected, orden", done: true },
+      { label: "[API] POST /api/campaigns/generate-concepts → Claude genera 3-5 conceptos basado en EmpresaIdentidad + brief", done: true },
+      { label: "[UI] Paso 'Conceptos' integrado en wizard como Step 4 (entre Oferta y Estructura) — wizard ahora 6 pasos", done: true },
+      { label: "[UI] Cards de concepto: nombre, hipótesis, ángulo badge, framework badge, dirección visual — elegir con checkbox", done: true },
+      { label: "[UI] Botón 'Regenerar conceptos' con loader — paso opcional (se puede saltar)", done: true },
+      { label: "[AI] Piece generate: incluir conceptos seleccionados en el prompt de cada pieza", done: true },
+      { label: "[AI] Concepto generation: hipótesis (por qué va a funcionar) + ángulo + framework recomendado + dirección visual", done: true },
+      { label: "[DB] Conceptos guardados en DB al crear campaña via POST /api/campaigns", done: true },
+    ],
+  },
+
+  {
+    fase: "Fase 29 — Fixes y Potenciación del Motor Creativo",
+    status: "done" as const,
+    items: [
+      { label: "[BUG] prompt-generator.ts: Headlines ≤27 chars → corregido a ≤40 (límite real Meta Ads)", done: true },
+      { label: "[BUG] Wizard Step Conceptos en posición incorrecta → movido después de Catálogo (Brief→Oferta→Catálogo→Conceptos→Estructura)", done: true },
+      { label: "[ARCH] Unificar dos pipelines de generación: campaign brief JSON → auto-popular guionGenerado + copyGenerado + imageBriefGenerado en cada Piece de DB", done: true },
+      { label: "[API] campaigns/[id]/generate: parsea JSON post-generación y actualiza cada Piece en DB con copy + guión + imageBrief (match posicional por adSet.orden + piece.orden)", done: true },
+      { label: "[UI] Board: Piece con aiGeneratedAt ya muestra 'Regenerar' en vez de 'Generar con IA' — aprovecha el auto-populate del brief", done: true },
+      { label: "[UX] Brief Step 2: auto-completa publicoObjetivo, tonoYestilo, propuestasValor, queNOhacer desde EmpresaIdentidad al montar (solo si campos vacíos)", done: true },
+      { label: "[UX] Brief Step 2: botón 'Cargar perfil' para recargar identidad de empresa en cualquier momento", done: true },
+      { label: "[INFRA] Rate limit separado: campaign brief = 3/día (key ai_brief:wid), piece generate = 30/día (key ai_piece:wid)", done: true },
+      { label: "[UX] Wizard Step Presupuesto: warning si budget por ad set < COP 60.000/día en ABO (Meta best practice ≥$15 USD/ad set/día)", done: true },
+    ],
+  },
+
+  {
+    fase: "Fase 27 — Detección de Fatiga Creativa",
+    status: "pending" as const,
+    items: [
+      { label: "[DB] Piece: campo fatigaDetectadaAt (DateTime?) para registrar cuándo se detectó fatiga", done: false },
+      { label: "[API] Algoritmo fatiga: pieza PUBLICADO con CTR caída >20% en 14 días vs baseline → marcar fatigaDetectadaAt", done: false },
+      { label: "[API] POST /api/empresas/[id]/fatigue-check → corre el algoritmo para todas las piezas de la empresa", done: false },
+      { label: "[UI] Badge 'Fatiga' en PieceCard del board (naranja) cuando fatigaDetectadaAt != null", done: false },
+      { label: "[UI] Panel en /metrics/empresa/[id] Tab Creativos: lista de piezas con fatiga detectada + días activa", done: false },
+      { label: "[NOTIF] Notificación in-app al OWNER cuando una pieza entra en estado de fatiga", done: false },
+      { label: "[UI] Botón 'Crear renovación' en pieza con fatiga → crea nueva pieza basada en la fatigada con badge 'Refresh'", done: false },
+    ],
+  },
+
+  {
+    fase: "Fase 28 — Meta Ads Health Score + Auditoría de Cuenta",
+    status: "pending" as const,
+    items: [
+      { label: "[DB] Modelo AuditResult: id, empresaId, score (Int), checks (Json), quickWins (Json), createdAt", done: false },
+      { label: "[API] POST /api/empresas/[id]/audit → corre checks automáticos + Claude genera Quick Wins, guarda resultado", done: false },
+      { label: "[AI] Checks automáticos (50): formato diversity, creative fatigue %, learning limited %, CAPI conectado, frequency cap, budget sufficiency, CTR vs benchmark", done: false },
+      { label: "[AI] Claude genera Quick Wins priorizados por impacto basado en checks fallidos", done: false },
+      { label: "[UI] Tab 'Auditoría' en /metrics/empresa/[id]: Health Score 0-100, tabla PASS/WARNING/FAIL por check", done: false },
+      { label: "[UI] Quick Wins section: lista ordenada por impacto estimado con acción sugerida", done: false },
+      { label: "[UI] Badge de score (0-100) en card de empresa en /metrics con semáforo de color", done: false },
+      { label: "[UI] Botón 'Re-auditar' con timestamp del último audit", done: false },
+      { label: "[UI] Comparativa: score actual vs score período anterior", done: false },
+    ],
+  },
+
+  {
+    fase: "Fase 30 — Fixes Ciclo de Vida de Conceptos + Calidad de Pipeline",
+    status: "done" as const,
+    items: [
+      // 🔴 Críticos — Fase 26 rota end-to-end
+      { label: "[BUG] Conceptos NO entran en campaign brief generation: generate route no selecciona conceptos de DB ni los inyecta en el prompt", done: true },
+      { label: "[BUG] promptMaestro no incluye conceptos seleccionados: prompt-generator.ts ignora state.conceptos aunque está disponible", done: true },
+      { label: "[BUG] PATCH action:complete no guarda conceptos a DB (solo POST /api/campaigns lo hace)", done: true },
+      { label: "[BUG] campaignToWizardState no mapea conceptos al restaurar draft desde DB → siempre vacíos", done: true },
+      { label: "[BUG] GET /api/campaigns/[id] no incluía conceptos → restauración desde DB fallaba silenciosamente", done: true },
+      { label: "[BUG] Autosave DB (action:autosave) no persiste conceptos → corregido currentStep a Math.min(..., 8)", done: true },
+      // 🟡 Altos
+      { label: "[SEC] Sin rate limit en POST /api/campaigns/generate-concepts → llamadas ilimitadas a Claude", done: true },
+      { label: "[TRACK] Sin AiUsage tracking en generate-concepts → costo de tokens no registrado", done: true },
+      // 🟠 Medios
+      { label: "[BUG] currentStep hardcodeado a 7 en PATCH action:complete → corregido a 8", done: true },
+      { label: "[BUG] campaignToWizardState clampea currentStep a 7 → corregido a 8", done: true },
+      { label: "[PERF] useEffect sin dep array en useWizardDraft → agregado eslint-disable comment (comportamiento intencional)", done: true },
+      { label: "[UX] Validador Step 1 solo verifica texto empresa, no empresaId → EmpresaIdentidad nunca carga si no hay selección real", done: true },
+    ],
+  },
+
+  {
+    fase: "Fase 23 — AI Core SuperAdmin (corazón configurable de la IA)",
+    status: "done" as const,
+    items: [
+      { label: "[DB] Modelo AiCore: id, systemPrompt (Text), version (Int), isActive, createdAt, updatedAt", done: true },
+      { label: "[DB] Modelo AiCoreVersion: id, aiCoreId, systemPrompt, version, createdAt (historial)", done: true },
+      { label: "[API] GET /api/admin/ai-core → obtiene AiCore activo con historial (solo SUPER_ADMIN)", done: true },
+      { label: "[API] PATCH /api/admin/ai-core → actualiza systemPrompt → crea versión anterior automáticamente", done: true },
+      { label: "[API] POST /api/admin/ai-core/versions/[v]/restore → restaura versión anterior como activa", done: true },
+      { label: "[UI] Página /admin/ai-core: editor de SYSTEM_PROMPT con textarea + historial expandible", done: true },
+      { label: "[UI] Historial: versión, fecha, preview 80 chars, botón restaurar", done: true },
+      { label: "[AI] generate routes (campaign + piece): cargan SYSTEM_PROMPT desde DB con cache 60s", done: true },
+      { label: "[AI] Fallback: si no hay AiCore en DB, usa SYSTEM_PROMPT hardcoded en lib/ai/client.ts", done: true },
+      { label: "[AI] invalidateSystemPromptCache() llamado al guardar/restaurar AiCore", done: true },
+      { label: "[NAV] Link 'AI Core' en sidebar admin", done: true },
+      { label: "[DB] AiCoreRule: CRUD de reglas de comportamiento por industria/rol", done: false },
+      { label: "[SEED] Crear registro inicial AiCore con SYSTEM_PROMPT genérico actual", done: true },
+    ],
+  },
+
+  {
+    fase: "Fase 31 — Performance + Deuda técnica DB (2026-04-30)",
+    status: "done" as const,
+    items: [
+      { label: "[PERF] N+1 en POST /api/campaigns: adSet+pieces creados en loop secuencial → Promise.all + nested createMany", done: true },
+      { label: "[PERF] N+1 en PATCH action:complete: mismo patrón → Promise.all + nested createMany", done: true },
+      { label: "[PERF] concepto.create loop → concepto.createMany (batch en ambas rutas)", done: true },
+      { label: "[PERF] existingAdSets findMany → count (solo necesitamos saber si hay, no los IDs)", done: true },
+      { label: "[ATOM] action:status: campaign.update + auditLog.create → db.$transaction([])", done: true },
+      { label: "[ATOM] action:archive: mismo patrón → db.$transaction([])", done: true },
+      { label: "[SEC] auditLogs sin take limit en GET /api/campaigns/[id] → take: 50", done: true },
+      { label: "[PERF] Board: filtro CREATIVO en memoria JS → WHERE assigneeId en DB query", done: true },
+      { label: "[PERF] Board: no filtraba campañas archivadas → isArchived: false en WHERE", done: true },
+      { label: "[PERF] Empresa PATCH: findUnique + update (2 queries) → update con workspaceId-scoped WHERE + catch P2025", done: true },
+      { label: "[DB] Migración tabla Producto: npx prisma db push (tabla productos en Neon)", done: true },
+      // Fase 22 — catálogo de productos
+      { label: "[FEAT] Modelo Producto en Prisma + tabla products en Neon", done: true },
+      { label: "[FEAT] Step 4 Modelos → Productos: carga catálogo desde /api/empresas/[id]/productos", done: true },
+      { label: "[FEAT] Step 4: checkboxes del catálogo con pre-fill de precios desde DB", done: true },
+      { label: "[FEAT] /empresas/[id]: sección Catálogo de productos con add/delete UI", done: true },
+    ],
+  },
+
+  {
+    fase: "Fase 24 — EmpresaIdentidad expandida (contexto profundo para IA)",
+    status: "done" as const,
+    items: [
+      { label: "[DB] EmpresaIdentidad: campo industria (String?) — descripción de industria para IA", done: true },
+      { label: "[DB] EmpresaIdentidad: campo modeloNegocio (String?) — B2B, B2C, marketplace, suscripción, etc.", done: true },
+      { label: "[DB] EmpresaIdentidad: campo ticketPromedio (String?) — rango de precio promedio por venta", done: true },
+      { label: "[DB] EmpresaIdentidad: campo cicloVenta (String?) — tiempo promedio desde interés hasta compra", done: true },
+      { label: "[DB] EmpresaIdentidad: campo temporadasClave (String?) — meses o eventos de mayor venta", done: true },
+      { label: "[DB] EmpresaIdentidad: campo equipoCreativo (String?) — roles disponibles en el equipo interno", done: true },
+      { label: "[DB] EmpresaIdentidad: campo metaPrincipal (String?) — objetivo principal de las campañas (ventas, leads, awareness)", done: true },
+      { label: "[API] PATCH /api/empresas/[id]/identidad: acepta y persiste los 7 campos nuevos", done: true },
+      { label: "[UI] Formulario /empresas/[id]: nueva sección 'Contexto de negocio' con los 7 campos", done: true },
+      { label: "[UI] Formulario /empresas/nueva: preguntar industria y modeloNegocio en paso 1", done: false },
+      { label: "[AI] campaigns/generate: incluir los 7 campos nuevos en el contexto de empresa del system prompt", done: true },
+      { label: "[AI] pieces/generate: incluir los 7 campos nuevos en el contexto de empresa", done: true },
+      { label: "[AI] Validar con 3 industrias distintas: brief generado debe ser contextualmente preciso", done: false },
+    ],
+  },
 ]
 
 const STATUS_STYLE = {
-  done: { bg: "bg-emerald-50 border-emerald-200", badge: "bg-emerald-100 text-emerald-700", label: "Completado" },
-  "in-progress": { bg: "bg-primary/5 border-primary/20", badge: "bg-primary/10 text-primary", label: "En progreso" },
-  pending: { bg: "bg-card border-border", badge: "bg-muted text-muted-foreground", label: "Pendiente" },
+  done: { bg: "bg-emerald-50 border-emerald-200", badge: "bg-emerald-100 text-emerald-700", label: "Completado", dot: "bg-emerald-500" },
+  "in-progress": { bg: "bg-primary/5 border-primary/20", badge: "bg-primary/10 text-primary", label: "En progreso", dot: "bg-primary animate-pulse" },
+  pending: { bg: "bg-card border-border", badge: "bg-muted text-muted-foreground", label: "Pendiente", dot: "bg-muted-foreground/30" },
+}
+
+function FaseAccordion({ fase }: { fase: typeof ROADMAP[0] }) {
+  const st = STATUS_STYLE[fase.status]
+  const doneCount = fase.items.filter(i => i.done).length
+  const [open, setOpen] = useState(fase.status === "in-progress")
+
+  return (
+    <div className={`rounded-2xl border overflow-hidden ${st.bg}`}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-black/[0.03]"
+      >
+        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${st.dot}`} />
+        <span className="flex-1 text-sm font-semibold text-foreground">{fase.fase}</span>
+        <span className={`px-2 py-0.5 rounded-md text-xs font-semibold flex-shrink-0 ${st.badge}`}>{st.label}</span>
+        <span className="text-xs text-muted-foreground font-mono flex-shrink-0 w-10 text-right">{doneCount}/{fase.items.length}</span>
+        {open
+          ? <ChevronUpIcon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+          : <ChevronDownIcon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+        }
+      </button>
+
+      {open && (
+        <div className="px-5 pb-4 pt-1 border-t border-black/5">
+          <ul className="space-y-2 pt-2">
+            {fase.items.map((item) => (
+              <li key={item.label} className="flex items-start gap-2.5 text-sm">
+                <span className={`mt-0.5 w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold ${item.done ? "bg-emerald-500 text-white" : "border-2 border-border bg-background"}`}>
+                  {item.done ? "✓" : ""}
+                </span>
+                <span className={item.done ? "text-muted-foreground line-through" : "text-foreground"}>{item.label}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function RoadmapPage() {
@@ -440,32 +738,10 @@ export default function RoadmapPage() {
         <p className="text-sm text-muted-foreground mt-0.5">Estado del desarrollo de Traffely</p>
       </div>
 
-      <div className="space-y-4">
-        {ROADMAP.map((fase) => {
-          const st = STATUS_STYLE[fase.status]
-          const done = fase.items.filter(i => i.done).length
-          return (
-            <div key={fase.fase} className={`rounded-2xl border p-5 ${st.bg}`}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-sm font-semibold text-foreground">{fase.fase}</h2>
-                  <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${st.badge}`}>{st.label}</span>
-                </div>
-                <span className="text-xs text-muted-foreground font-mono">{done}/{fase.items.length}</span>
-              </div>
-              <ul className="space-y-2">
-                {fase.items.map((item) => (
-                  <li key={item.label} className="flex items-center gap-2.5 text-sm">
-                    <span className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold ${item.done ? "bg-emerald-500 text-white" : "border-2 border-border bg-background"}`}>
-                      {item.done ? "✓" : ""}
-                    </span>
-                    <span className={item.done ? "text-muted-foreground line-through" : "text-foreground"}>{item.label}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )
-        })}
+      <div className="space-y-2">
+        {ROADMAP.map((fase) => (
+          <FaseAccordion key={fase.fase} fase={fase} />
+        ))}
       </div>
     </div>
   )

@@ -4,6 +4,7 @@ import { db } from "@/lib/db/prisma"
 import bcrypt from "bcryptjs"
 import { z } from "zod"
 import { logger } from "@/lib/logger"
+import { sendInviteEmail } from "@/lib/email"
 
 const ALLOWED_ROLES = ["CREATIVO", "TRAFFICKER", "VIEWER"] as const
 
@@ -52,7 +53,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Ya existe un usuario con ese email" }, { status: 409 })
     }
 
-    const hashed = await bcrypt.hash(password, 10)
+    const [hashed, workspace] = await Promise.all([
+      bcrypt.hash(password, 10),
+      db.workspace.findUnique({
+        where: { id: session.user.workspaceId },
+        select: { name: true },
+      }),
+    ])
+
     const user = await db.user.create({
       data: {
         name: name.trim(),
@@ -72,6 +80,18 @@ export async function POST(req: Request) {
         diff: { invitedUserId: user.id, role, workspaceId: session.user.workspaceId },
       },
     })
+
+    // Email de invitación — fire-and-forget, no bloquea la respuesta
+    if (process.env.RESEND_API_KEY) {
+      sendInviteEmail({
+        to: email.toLowerCase(),
+        name: name.trim(),
+        workspaceName: workspace?.name ?? "Traffely",
+        role,
+        password,
+        inviterName: session.user.name ?? "El administrador",
+      }).catch((err) => logger.error("sendInviteEmail", err, { userId: user.id }))
+    }
 
     return NextResponse.json(user, { status: 201 })
   } catch (err) {

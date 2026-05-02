@@ -5,10 +5,7 @@ import {
   OFERTAS_CONFIG,
   CHIPS_DETALLE_POR_OFERTA,
   CHIPS_PAGO,
-  CHIPS_REGALO,
-  CHIPS_GARANTIA,
-  CHIPS_CAMBIOS,
-  CHIPS_ENVIO,
+  CHIPS_BY_TIPO,
 } from "../../../constants/campaign-data"
 import { cn } from "@/lib/utils"
 import type { TipoOferta } from "../../../types"
@@ -55,15 +52,24 @@ function ChipGroup({
   )
 }
 
+const TIPO_PRODUCTO_OPTIONS = [
+  { val: "fisico", label: "Físico", icon: "📦", desc: "Productos con envío" },
+  { val: "digital", label: "Digital", icon: "💻", desc: "Software, apps, cursos" },
+  { val: "servicio", label: "Servicio", icon: "🤝", desc: "Consultoría, agencia" },
+] as const
+
 export default function Step3Oferta() {
   const {
     tipoOferta, setTipoOferta,
+    tipoProducto,
     contextoOferta,
     ofertaMetodosPago, ofertaRegalo, ofertaGarantia, ofertaCambios, ofertaEnvio,
     appendOfertaField, setField,
   } = useCampaignWizard()
 
   const chips = tipoOferta ? (CHIPS_DETALLE_POR_OFERTA[tipoOferta] ?? []) : []
+  const tipoKey = (tipoProducto || "fisico") as "fisico" | "digital" | "servicio"
+  const contextualChips = CHIPS_BY_TIPO[tipoKey]
 
   function handleShopifyProduct(product: ShopifyProductSimple) {
     // Pre-fill oferta fields con el primer producto/variante
@@ -100,6 +106,30 @@ export default function Step3Oferta() {
 
       {/* Importar desde Shopify */}
       <ShopifyProductPicker mode="product" onSelectProduct={handleShopifyProduct} />
+
+      {/* Tipo de producto — contextualiza todos los chips */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-foreground">¿Qué tipo de producto o servicio ofreces?</label>
+        <p className="text-xs text-muted-foreground">Adapta las sugerencias según la naturaleza de tu oferta.</p>
+        <div className="flex gap-2">
+          {TIPO_PRODUCTO_OPTIONS.map((t) => (
+            <button
+              key={t.val}
+              onClick={() => setField("tipoProducto", t.val)}
+              className={cn(
+                "flex-1 p-3 rounded-xl border-2 text-center transition-all",
+                tipoProducto === t.val
+                  ? "border-primary bg-accent"
+                  : "border-border bg-card hover:border-primary/40"
+              )}
+            >
+              <p className="text-lg leading-none mb-1">{t.icon}</p>
+              <p className="text-xs font-semibold text-foreground">{t.label}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{t.desc}</p>
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Tipo oferta */}
       <div className="space-y-3">
@@ -162,11 +192,11 @@ export default function Step3Oferta() {
       {/* Condiciones adicionales */}
       <div className="space-y-4 pt-2 border-t border-border">
         <p className="text-sm font-medium text-foreground">Condiciones adicionales</p>
-        <ChipGroup label="Pagos" options={CHIPS_PAGO} value={ofertaMetodosPago} fieldKey="ofertaMetodosPago" onToggle={toggleChip} />
-        <ChipGroup label="Regalo" options={CHIPS_REGALO} value={ofertaRegalo} fieldKey="ofertaRegalo" onToggle={toggleChip} />
-        <ChipGroup label="Garantía" options={CHIPS_GARANTIA} value={ofertaGarantia} fieldKey="ofertaGarantia" onToggle={toggleChip} />
-        <ChipGroup label="Cambios" options={CHIPS_CAMBIOS} value={ofertaCambios} fieldKey="ofertaCambios" onToggle={toggleChip} />
-        <ChipGroup label="Envío" options={CHIPS_ENVIO} value={ofertaEnvio} fieldKey="ofertaEnvio" onToggle={toggleChip} />
+        <ChipGroup label="Pagos" options={[...CHIPS_PAGO]} value={ofertaMetodosPago} fieldKey="ofertaMetodosPago" onToggle={toggleChip} />
+        <ChipGroup label="Regalo" options={[...contextualChips.regalo]} value={ofertaRegalo} fieldKey="ofertaRegalo" onToggle={toggleChip} />
+        <ChipGroup label="Garantía" options={[...contextualChips.garantia]} value={ofertaGarantia} fieldKey="ofertaGarantia" onToggle={toggleChip} />
+        <ChipGroup label="Cambios" options={[...contextualChips.cambios]} value={ofertaCambios} fieldKey="ofertaCambios" onToggle={toggleChip} />
+        <ChipGroup label={tipoProducto === "digital" || tipoProducto === "servicio" ? "Entrega" : "Envío"} options={[...contextualChips.envio]} value={ofertaEnvio} fieldKey="ofertaEnvio" onToggle={toggleChip} />
       </div>
     </div>
   )

@@ -22,7 +22,7 @@ export interface Piece {
   estado: PieceEstado
   subpaso: 1 | 2
   // Sub-paso 1: esencial
-  modelo: string
+  producto: string
   tipoPieza: string
   trafico: string
   angulo: string
@@ -64,6 +64,18 @@ export interface ModeloPrecio {
   ahora: string
 }
 
+// ─── Concepto Creativo ────────────────────────────────────────────────────────
+
+export interface ConceptoWizard {
+  id: string
+  nombre: string
+  hipotesis: string
+  anguloMensajeria: string
+  frameworkCopy: string
+  direccionVisual: string
+  isSelected: boolean
+}
+
 // ─── Equipo ──────────────────────────────────────────────────────────────────
 
 export interface MiembroEquipo {
@@ -79,6 +91,8 @@ export interface CampaignWizardState {
   // Paso 1
   empresa: string
   empresaId: string
+  empresaIndustria: string
+  tipoProducto: "fisico" | "digital" | "servicio" | ""
 
   // Paso 2 · Brief
   tipoCampana: CampaignType | ""
@@ -104,11 +118,11 @@ export interface CampaignWizardState {
   ofertaCambios: string
   ofertaEnvio: string
 
-  // Paso 4 · Modelos
-  modelosSeleccionados: string[]
-  modelosCustom: string[]
-  preciosModelos: Record<string, ModeloPrecio>
-  modelosDescripcion: Record<string, string>
+  // Paso 4 · Productos
+  productosSeleccionados: string[]
+  productosCustom: string[]
+  preciosProductos: Record<string, ModeloPrecio>
+  productosDescripcion: Record<string, string>
 
   // Paso 5 · Estructura Meta
   objetivo: string
@@ -129,6 +143,9 @@ export interface CampaignWizardState {
   fechaInicio: string
   fechaFin: string
   sinFechaFin: boolean
+
+  // Paso 3 · Conceptos creativos (opcional)
+  conceptos: ConceptoWizard[]
 
   // Paso 7 · Equipo
   equipo: MiembroEquipo[]

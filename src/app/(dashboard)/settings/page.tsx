@@ -21,16 +21,26 @@ export default async function SettingsPage({
 
   const { tab = "workspace" } = await searchParams
 
-  const workspace = await db.workspace.findUnique({
-    where: { id: session.user.workspaceId },
-    select: {
-      name: true, slug: true, plan: true, aiProfile: true,
-      metaAdAccountId: true, metaEnabled: true,
-      shopifyEnabled: true,
-      monthlyFee: true, setupFee: true, billingStatus: true,
-      billingPlan: true, billingCycle: true, nextBillingDate: true,
-    },
-  })
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+  const [workspace, aiUsage] = await Promise.all([
+    db.workspace.findUnique({
+      where: { id: session.user.workspaceId },
+      select: {
+        name: true, slug: true, plan: true, aiProfile: true,
+        metaAdAccountId: true, metaEnabled: true,
+        shopifyEnabled: true,
+        monthlyFee: true, setupFee: true, billingStatus: true,
+        billingPlan: true, billingCycle: true, nextBillingDate: true,
+      },
+    }),
+    db.aiUsage.aggregate({
+      where: { workspaceId: session.user.workspaceId, createdAt: { gte: monthStart } },
+      _sum: { costUsd: true },
+      _count: { id: true },
+    }),
+  ])
 
   const isOwner = ["OWNER", "SUPER_ADMIN"].includes(session.user.role ?? "")
 
@@ -118,15 +128,30 @@ export default async function SettingsPage({
       {/* Tab: Facturación */}
       {tab === "billing" && (
         isOwner
-          ? <BillingSection
-              plan={workspace?.plan ?? "trial"}
-              billingStatus={workspace?.billingStatus ?? "pending"}
-              monthlyFee={workspace?.monthlyFee ?? 0}
-              setupFee={workspace?.setupFee ?? 0}
-              billingPlan={workspace?.billingPlan ?? null}
-              billingCycle={workspace?.billingCycle ?? null}
-              nextBillingDate={workspace?.nextBillingDate ?? null}
-            />
+          ? <>
+              <BillingSection
+                plan={workspace?.plan ?? "trial"}
+                billingStatus={workspace?.billingStatus ?? "pending"}
+                monthlyFee={workspace?.monthlyFee ?? 0}
+                setupFee={workspace?.setupFee ?? 0}
+                billingPlan={workspace?.billingPlan ?? null}
+                billingCycle={workspace?.billingCycle ?? null}
+                nextBillingDate={workspace?.nextBillingDate ?? null}
+              />
+              <div className="bg-card rounded-2xl border border-border p-5">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Uso de IA — este mes</p>
+                <div className="flex items-end gap-6">
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">{aiUsage._count.id}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">generaciones</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-foreground">${(aiUsage._sum.costUsd ?? 0).toFixed(4)}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">costo USD (Anthropic)</p>
+                  </div>
+                </div>
+              </div>
+            </>
           : <div className="bg-muted/40 rounded-2xl border border-border p-5 text-center text-sm text-muted-foreground">
               Solo el propietario puede ver la facturación.
             </div>

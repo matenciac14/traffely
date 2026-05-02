@@ -38,7 +38,7 @@ export default function InviteUserModal() {
 
     if (!res.ok) {
       const data = await res.json()
-      setError(data.error ?? "Error al invitar usuario")
+      setError(data.error ?? "Error al agregar usuario")
       return
     }
 
@@ -54,7 +54,7 @@ export default function InviteUserModal() {
         className="flex items-center gap-2 h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
       >
         <UserPlusIcon className="w-4 h-4" />
-        Invitar miembro
+        Agregar miembro
       </button>
 
       {open && (
@@ -65,7 +65,7 @@ export default function InviteUserModal() {
           {/* Modal */}
           <div className="relative bg-card border border-border rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-base font-semibold text-foreground">Invitar miembro</h3>
+              <h3 className="text-base font-semibold text-foreground">Agregar miembro</h3>
               <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">
                 <XIcon className="w-4 h-4" />
               </button>
@@ -145,7 +145,7 @@ export default function InviteUserModal() {
                     "bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50"
                   )}
                 >
-                  {loading ? "Creando…" : "Invitar"}
+                  {loading ? "Creando…" : "Agregar"}
                 </button>
               </div>
             </form>

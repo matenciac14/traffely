@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils"
 interface Props {
   onSelectProduct: (product: ShopifyProductSimple) => void
   onSelectVariantsAsModelos?: (product: ShopifyProductSimple) => void
-  mode: "product" | "modelos" // product = Step3, modelos = Step4
+  mode: "product" | "productos" // product = Step3, productos = Step4
 }
 
 export default function ShopifyProductPicker({ onSelectProduct, onSelectVariantsAsModelos, mode }: Props) {
@@ -51,7 +51,7 @@ export default function ShopifyProductPicker({ onSelectProduct, onSelectVariants
         className="w-full flex items-center gap-2 px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors"
       >
         <ShoppingBagIcon className="w-4 h-4 text-[#96bf48]" />
-        {mode === "product" ? "Importar producto desde Shopify" : "Importar modelos desde Shopify"}
+        {mode === "product" ? "Importar producto desde Shopify" : "Importar productos desde Shopify"}
         {loading && <span className="ml-auto text-xs text-muted-foreground animate-pulse">Cargando…</span>}
         {!loading && (open ? <ChevronUpIcon className="ml-auto w-4 h-4 text-muted-foreground" /> : <ChevronDownIcon className="ml-auto w-4 h-4 text-muted-foreground" />)}
       </button>
@@ -120,7 +120,7 @@ export default function ShopifyProductPicker({ onSelectProduct, onSelectVariants
                         Usar
                       </button>
                     )}
-                    {mode === "modelos" && onSelectVariantsAsModelos && (
+                    {mode === "productos" && onSelectVariantsAsModelos && (
                       <button
                         onClick={() => { onSelectVariantsAsModelos(product); setOpen(false) }}
                         className={cn("px-2.5 py-1 rounded-lg text-xs font-medium border transition-all",

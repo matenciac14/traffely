@@ -15,18 +15,46 @@ const BILLING_LABELS: Record<string, string> = {
 
 export default async function WorkspaceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const workspace = await db.workspace.findUnique({
-    where: { id },
-    include: {
-      users: { orderBy: { createdAt: "asc" } },
-      _count: { select: { campaigns: true } },
-    },
-    // metaEnabled is included by default in the model
-  })
+
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+  const [workspace, aiUsageTotal, aiUsageMonth, aiByAction] = await Promise.all([
+    db.workspace.findUnique({
+      where: { id },
+      include: {
+        users: { orderBy: { createdAt: "asc" } },
+        _count: { select: { campaigns: true } },
+      },
+    }),
+    db.aiUsage.aggregate({
+      where: { workspaceId: id },
+      _sum: { costUsd: true, inputTokens: true, outputTokens: true },
+      _count: { id: true },
+    }),
+    db.aiUsage.aggregate({
+      where: { workspaceId: id, createdAt: { gte: monthStart } },
+      _sum: { costUsd: true },
+      _count: { id: true },
+    }),
+    db.aiUsage.groupBy({
+      by: ["action"],
+      where: { workspaceId: id },
+      _sum: { costUsd: true },
+      _count: { id: true },
+      orderBy: { _sum: { costUsd: "desc" } },
+    }),
+  ])
 
   if (!workspace) notFound()
 
   const totalRevenue = workspace.setupFee + (workspace.monthlyFee * 12)
+  const ACTION_LABELS: Record<string, string> = {
+    generate_brief: "Brief completo",
+    piece_generate: "Por pieza",
+    generate_concepts: "Conceptos",
+    work_plan: "Plan de trabajo",
+  }
 
   return (
     <div className="p-8 max-w-4xl mx-auto space-y-6">
@@ -128,6 +156,38 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* AI Usage */}
+      <div className="bg-card rounded-2xl border border-border overflow-hidden">
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-foreground">Uso de IA</h2>
+          <span className="text-xs text-muted-foreground">{aiUsageTotal._count.id} llamadas totales</span>
+        </div>
+        <div className="grid grid-cols-3 divide-x divide-border">
+          <div className="px-5 py-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Este mes</p>
+            <p className="text-lg font-bold text-foreground">${(aiUsageMonth._sum.costUsd ?? 0).toFixed(4)}</p>
+            <p className="text-xs text-muted-foreground">{aiUsageMonth._count.id} llamadas</p>
+          </div>
+          <div className="px-5 py-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Total acumulado</p>
+            <p className="text-lg font-bold text-foreground">${(aiUsageTotal._sum.costUsd ?? 0).toFixed(4)}</p>
+            <p className="text-xs text-muted-foreground font-mono">{((aiUsageTotal._sum.inputTokens ?? 0) + (aiUsageTotal._sum.outputTokens ?? 0)).toLocaleString()} tokens</p>
+          </div>
+          <div className="px-5 py-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Por tipo</p>
+            <div className="space-y-1 mt-1">
+              {aiByAction.map(a => (
+                <div key={a.action} className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">{ACTION_LABELS[a.action] ?? a.action}</span>
+                  <span className="font-mono font-semibold text-foreground">${(a._sum.costUsd ?? 0).toFixed(4)}</span>
+                </div>
+              ))}
+              {aiByAction.length === 0 && <p className="text-xs text-muted-foreground">Sin datos</p>}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Revenue summary */}

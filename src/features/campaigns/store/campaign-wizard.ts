@@ -1,7 +1,7 @@
 import { create } from "zustand"
 import { devtools } from "zustand/middleware"
-import type { CampaignWizardState, Piece, AdSet, CampanaWizard, TipoOferta, AutoMode } from "../types"
-import { MODELOS_BASE, EQUIPO_DEFAULT } from "../constants/campaign-data"
+import type { CampaignWizardState, Piece, AdSet, CampanaWizard, TipoOferta, AutoMode, ConceptoWizard } from "../types"
+import { EQUIPO_DEFAULT } from "../constants/campaign-data"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -9,12 +9,12 @@ function nanoid(prefix = "P") {
   return prefix + Math.random().toString(36).substring(2, 7).toUpperCase()
 }
 
-export function newPieza(estado: "activa" | "reserva" = "activa", modelo = ""): Piece {
+export function newPieza(estado: "activa" | "reserva" = "activa", producto = ""): Piece {
   return {
     id: nanoid("P"),
     estado,
     subpaso: 1,
-    modelo,
+    producto,
     tipoPieza: "",
     formato: "",
     carruselSlides: 5,
@@ -54,6 +54,8 @@ const INITIAL_STATE: CampaignWizardState = {
   currentStep: 1,
   empresa: "",
   empresaId: "",
+  empresaIndustria: "",
+  tipoProducto: "",
   tipoCampana: "",
   eventoEstacional: "",
   eventoCustom: "",
@@ -74,10 +76,10 @@ const INITIAL_STATE: CampaignWizardState = {
   ofertaGarantia: "",
   ofertaCambios: "",
   ofertaEnvio: "",
-  modelosSeleccionados: [],
-  modelosCustom: [],
-  preciosModelos: {},
-  modelosDescripcion: {},
+  productosSeleccionados: [],
+  productosCustom: [],
+  preciosProductos: {},
+  productosDescripcion: {},
   objetivo: "",
   tipoPresupuesto: "ABO",
   campanas: [],
@@ -94,6 +96,7 @@ const INITIAL_STATE: CampaignWizardState = {
   fechaInicio: "",
   fechaFin: "",
   sinFechaFin: false,
+  conceptos: [],
   equipo: EQUIPO_DEFAULT,
   _avisoReservaMostrado: false,
 }
@@ -122,11 +125,11 @@ interface CampaignWizardActions {
   appendOfertaField: (field: keyof CampaignWizardState, value: string) => void
 
   // Step 4
-  toggleModelo: (nombre: string) => void
-  updatePrecio: (modelo: string, tipo: "antes" | "ahora", valor: string) => void
-  updateModeloDesc: (modelo: string, valor: string) => void
-  agregarModeloCustom: (nombre: string) => void
-  eliminarModeloCustom: (nombre: string) => void
+  toggleProducto: (nombre: string) => void
+  updatePrecio: (producto: string, tipo: "antes" | "ahora", valor: string) => void
+  updateProductoDesc: (producto: string, valor: string) => void
+  agregarProductoCustom: (nombre: string) => void
+  eliminarProductoCustom: (nombre: string) => void
 
   // Step 5 · Asistente
   setAutoMode: (mode: AutoMode) => void
@@ -148,13 +151,17 @@ interface CampaignWizardActions {
   setSubpaso: (ci: number, cji: number, pi: number, n: 1 | 2) => void
   duplicarPiezas: (ci: number) => void
 
-  // Step 7
+  // Step 3 · Conceptos
+  setConceptos: (conceptos: ConceptoWizard[]) => void
+  toggleConcepto: (id: string) => void
+
+  // Step 7 (now Step 8)
   agregarPersona: () => void
   eliminarPersona: (i: number) => void
   updatePersona: (i: number, field: "rol" | "email", value: string) => void
 
   // Computed helpers
-  getAllModelos: () => string[]
+  getAllProductos: () => string[]
   getTotalPiezas: () => number
 }
 
@@ -173,17 +180,12 @@ export const useCampaignWizard = create<CampaignWizardState & CampaignWizardActi
         const state = get()
         const result = validarPaso(state, state.currentStep)
         if (!result.ok) return result
-        set((s) => ({
-          currentStep: s.currentStep === 7 ? 8 : s.currentStep + 1,
-          _avisoReservaMostrado: false,
-        }))
+        set((s) => ({ currentStep: s.currentStep + 1, _avisoReservaMostrado: false }))
         return { ok: true }
       },
 
       goBack: () =>
-        set((s) => ({
-          currentStep: s.currentStep === 8 ? 7 : Math.max(1, s.currentStep - 1),
-        })),
+        set((s) => ({ currentStep: Math.max(1, s.currentStep - 1) })),
 
       setStep: (step) => set({ currentStep: step }),
 
@@ -213,7 +215,16 @@ export const useCampaignWizard = create<CampaignWizardState & CampaignWizardActi
 
       setField: (key, value) => set({ [key]: value } as unknown as Partial<CampaignWizardState>),
 
-      // ── Step 3 ──────────────────────────────────────────────────────────────
+      // ── Step 3 · Conceptos ──────────────────────────────────────────────────
+
+      setConceptos: (conceptos) => set({ conceptos }),
+
+      toggleConcepto: (id) =>
+        set((s) => ({
+          conceptos: s.conceptos.map((c) => (c.id === id ? { ...c, isSelected: !c.isSelected } : c)),
+        })),
+
+      // ── Step 4 · Oferta ─────────────────────────────────────────────────────
 
       setTipoOferta: (tipo) => set({ tipoOferta: tipo }),
 
@@ -227,53 +238,53 @@ export const useCampaignWizard = create<CampaignWizardState & CampaignWizardActi
 
       // ── Step 4 ──────────────────────────────────────────────────────────────
 
-      toggleModelo: (nombre) =>
+      toggleProducto: (nombre) =>
         set((s) => {
-          const idx = s.modelosSeleccionados.indexOf(nombre)
+          const idx = s.productosSeleccionados.indexOf(nombre)
           if (idx >= 0) {
-            const next = [...s.modelosSeleccionados]
+            const next = [...s.productosSeleccionados]
             next.splice(idx, 1)
-            const precios = { ...s.preciosModelos }
-            const descs = { ...s.modelosDescripcion }
+            const precios = { ...s.preciosProductos }
+            const descs = { ...s.productosDescripcion }
             delete precios[nombre]
             delete descs[nombre]
-            return { modelosSeleccionados: next, preciosModelos: precios, modelosDescripcion: descs }
+            return { productosSeleccionados: next, preciosProductos: precios, productosDescripcion: descs }
           }
           return {
-            modelosSeleccionados: [...s.modelosSeleccionados, nombre],
-            preciosModelos: { ...s.preciosModelos, [nombre]: { antes: "", ahora: "" } },
+            productosSeleccionados: [...s.productosSeleccionados, nombre],
+            preciosProductos: { ...s.preciosProductos, [nombre]: { antes: "", ahora: "" } },
           }
         }),
 
-      updatePrecio: (modelo, tipo, valor) =>
+      updatePrecio: (producto, tipo, valor) =>
         set((s) => ({
-          preciosModelos: {
-            ...s.preciosModelos,
-            [modelo]: { ...(s.preciosModelos[modelo] || { antes: "", ahora: "" }), [tipo]: valor },
+          preciosProductos: {
+            ...s.preciosProductos,
+            [producto]: { ...(s.preciosProductos[producto] || { antes: "", ahora: "" }), [tipo]: valor },
           },
         })),
 
-      updateModeloDesc: (modelo, valor) =>
-        set((s) => ({ modelosDescripcion: { ...s.modelosDescripcion, [modelo]: valor } })),
+      updateProductoDesc: (producto, valor) =>
+        set((s) => ({ productosDescripcion: { ...s.productosDescripcion, [producto]: valor } })),
 
-      agregarModeloCustom: (nombre) =>
+      agregarProductoCustom: (nombre) =>
         set((s) => ({
-          modelosCustom: [...s.modelosCustom, nombre],
-          modelosSeleccionados: [...s.modelosSeleccionados, nombre],
-          preciosModelos: { ...s.preciosModelos, [nombre]: { antes: "", ahora: "" } },
+          productosCustom: [...s.productosCustom, nombre],
+          productosSeleccionados: [...s.productosSeleccionados, nombre],
+          preciosProductos: { ...s.preciosProductos, [nombre]: { antes: "", ahora: "" } },
         })),
 
-      eliminarModeloCustom: (nombre) =>
+      eliminarProductoCustom: (nombre) =>
         set((s) => {
-          const precios = { ...s.preciosModelos }
-          const desc = { ...s.modelosDescripcion }
+          const precios = { ...s.preciosProductos }
+          const desc = { ...s.productosDescripcion }
           delete precios[nombre]
           delete desc[nombre]
           return {
-            modelosCustom: s.modelosCustom.filter((m) => m !== nombre),
-            modelosSeleccionados: s.modelosSeleccionados.filter((m) => m !== nombre),
-            preciosModelos: precios,
-            modelosDescripcion: desc,
+            productosCustom: s.productosCustom.filter((m) => m !== nombre),
+            productosSeleccionados: s.productosSeleccionados.filter((m) => m !== nombre),
+            preciosProductos: precios,
+            productosDescripcion: desc,
           }
         }),
 
@@ -297,9 +308,9 @@ export const useCampaignWizard = create<CampaignWizardState & CampaignWizardActi
 
       crearEstructuraAuto: () =>
         set((s) => {
-          const { autoMode, autoCampanas, autoConjuntos, autoPiezasXConj, autoPiezasCustom, nombreCampana, tipoPresupuesto, modelosSeleccionados, modelosCustom } = s
-          const allModelos = [...modelosSeleccionados, ...modelosCustom]
-          const defaultModelo = allModelos.length === 1 ? allModelos[0] : ""
+          const { autoMode, autoCampanas, autoConjuntos, autoPiezasXConj, autoPiezasCustom, nombreCampana, tipoPresupuesto, productosSeleccionados, productosCustom } = s
+          const allProductos = [...productosSeleccionados, ...productosCustom]
+          const defaultProducto = allProductos.length === 1 ? allProductos[0] : ""
           const baseName = nombreCampana || "Campaña"
           const campanas: CampanaWizard[] = []
 
@@ -311,7 +322,7 @@ export const useCampaignWizard = create<CampaignWizardState & CampaignWizardActi
               const nPiezas = autoMode === "quick" ? autoPiezasXConj : (autoPiezasCustom[cji] || 1)
               const conj = newConjunto(`Conjunto ${cji + 1}`)
               for (let pi = 0; pi < nPiezas; pi++) {
-                conj.piezas.push(newPieza("activa", defaultModelo))
+                conj.piezas.push(newPieza("activa", defaultProducto))
               }
               conjuntos.push(conj)
             }
@@ -374,11 +385,11 @@ export const useCampaignWizard = create<CampaignWizardState & CampaignWizardActi
 
       agregarPieza: (ci, cji, estado) =>
         set((s) => {
-          const allModelos = [...s.modelosSeleccionados, ...s.modelosCustom]
-          const defaultModelo = allModelos.length === 1 ? allModelos[0] : ""
+          const allProductos = [...s.productosSeleccionados, ...s.productosCustom]
+          const defaultProducto = allProductos.length === 1 ? allProductos[0] : ""
           const next = [...s.campanas]
           const conjs = [...next[ci].conjuntos]
-          conjs[cji] = { ...conjs[cji], piezas: [...conjs[cji].piezas, newPieza(estado, defaultModelo)] }
+          conjs[cji] = { ...conjs[cji], piezas: [...conjs[cji].piezas, newPieza(estado, defaultProducto)] }
           next[ci] = { ...next[ci], conjuntos: conjs }
           return { campanas: next }
         }),
@@ -446,9 +457,9 @@ export const useCampaignWizard = create<CampaignWizardState & CampaignWizardActi
 
       // ── Computed ────────────────────────────────────────────────────────────
 
-      getAllModelos: () => {
+      getAllProductos: () => {
         const s = get()
-        return [...s.modelosCustom]
+        return [...s.productosCustom]
       },
 
       getTotalPiezas: () => {

@@ -51,11 +51,11 @@ export async function POST(req: Request) {
           cambios: wizardState.ofertaCambios,
           envio: wizardState.ofertaEnvio,
         },
-        modelos: JSON.parse(JSON.stringify({
-          seleccionados: wizardState.modelosSeleccionados,
-          custom: wizardState.modelosCustom,
-          precios: wizardState.preciosModelos,
-          descripcion: wizardState.modelosDescripcion,
+        productos: JSON.parse(JSON.stringify({
+          seleccionados: wizardState.productosSeleccionados,
+          custom: wizardState.productosCustom,
+          precios: wizardState.preciosProductos,
+          descripcion: wizardState.productosDescripcion,
         })),
         estructura: JSON.parse(JSON.stringify({
           objetivo: wizardState.objetivo,
@@ -75,42 +75,58 @@ export async function POST(req: Request) {
       },
     })
 
-    // Materializar AdSets y Pieces desde la estructura del wizard
+    // Materializar AdSets y Pieces — batch paralelo
     let adSetOrden = 0
-    for (const campana of wizardState.campanas ?? []) {
-      for (const conjunto of campana.conjuntos ?? []) {
-        const adSet = await db.adSet.create({
+    const adSetJobs = (wizardState.campanas ?? []).flatMap((campana) =>
+      (campana.conjuntos ?? []).map((conjunto) => ({ campana, conjunto, orden: adSetOrden++ }))
+    )
+    await Promise.all(
+      adSetJobs.map(({ campana, conjunto, orden }) =>
+        db.adSet.create({
           data: {
             campaignId: campaign.id,
             nombre: `${campana.nombre} · ${conjunto.nombre}`,
             publico: conjunto.publico || null,
             porcentajePresupuesto: conjunto.porcentaje || null,
-            orden: adSetOrden++,
+            orden,
+            pieces: {
+              createMany: {
+                data: (conjunto.piezas ?? []).map((pieza, pieceOrden) => ({
+                  estado: pieza.estado === "reserva" ? "RESERVA" : "ACTIVA",
+                  taskStatus: "PENDIENTE",
+                  modelo: pieza.producto || null,
+                  tipoPieza: pieza.tipoPieza || null,
+                  trafico: pieza.trafico || null,
+                  angulo: pieza.angulo || null,
+                  conciencia: pieza.conciencia || null,
+                  motivo: pieza.motivo || null,
+                  narrativa: pieza.narrativa || null,
+                  estructuraCopy: pieza.estructuraCopy || null,
+                  formato: pieza.formato || null,
+                  duracion: pieza.duracion || null,
+                  orden: pieceOrden,
+                })),
+              },
+            },
           },
         })
+      )
+    )
 
-        let pieceOrden = 0
-        for (const pieza of conjunto.piezas ?? []) {
-          await db.piece.create({
-            data: {
-              adSetId: adSet.id,
-              estado: pieza.estado === "reserva" ? "RESERVA" : "ACTIVA",
-              taskStatus: "PENDIENTE",
-              modelo: pieza.modelo || null,
-              tipoPieza: pieza.tipoPieza || null,
-              trafico: pieza.trafico || null,
-              angulo: pieza.angulo || null,
-              conciencia: pieza.conciencia || null,
-              motivo: pieza.motivo || null,
-              narrativa: pieza.narrativa || null,
-              estructuraCopy: pieza.estructuraCopy || null,
-              formato: pieza.formato || null,
-              duracion: pieza.duracion || null,
-              orden: pieceOrden++,
-            },
-          })
-        }
-      }
+    // Save selected conceptos — batch
+    if (wizardState.conceptos?.length) {
+      await db.concepto.createMany({
+        data: wizardState.conceptos.map((c, i) => ({
+          campaignId: campaign.id,
+          nombre: c.nombre,
+          hipotesis: c.hipotesis || null,
+          anguloMensajeria: c.anguloMensajeria || null,
+          frameworkCopy: c.frameworkCopy || null,
+          direccionVisual: c.direccionVisual || null,
+          isSelected: c.isSelected,
+          orden: i,
+        })),
+      })
     }
 
     return NextResponse.json({ id: campaign.id })

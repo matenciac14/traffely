@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { ChevronDownIcon, ChevronUpIcon, BuildingIcon } from "lucide-react"
 import { useCampaignWizard } from "../../../store/campaign-wizard"
 import { EVENTOS_ESTACIONALES } from "../../../constants/campaign-data"
 import { cn } from "@/lib/utils"
@@ -15,6 +16,13 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       {children}
     </div>
   )
+}
+
+interface EmpresaIdentidadSnippet {
+  tono: string | null
+  publicoObjetivo: string | null
+  propuestasValor: string | null
+  palabrasProhibidas: string | null
 }
 
 function Chips({ options, value, onSelect }: { options: string[]; value: string; onSelect: (v: string) => void }) {
@@ -48,6 +56,7 @@ const GENEROS = ["Hombres", "Mujeres", "Todos"]
 
 export default function Step2Brief() {
   const {
+    empresaId, empresa: empresaNombre,
     tipoCampana, setTipoCampana,
     eventoEstacional, eventoCustom,
     nombreCampana,
@@ -61,6 +70,31 @@ export default function Step2Brief() {
   const [edadesSelected, setEdadesSelected] = useState<string[]>([])
   const [generoSelected, setGeneroSelected] = useState("")
   const [publicoCustom, setPublicoCustom] = useState("")
+
+  // Identidad de empresa cargada
+  const [identidad, setIdentidad] = useState<EmpresaIdentidadSnippet | null>(null)
+  const [overridesOpen, setOverridesOpen] = useState(false)
+
+  // Modo ligero: cuando hay empresa con identidad, solo mostramos campos campaign-specific
+  const modoLigero = !!empresaId && !!identidad
+
+  useEffect(() => {
+    if (!empresaId) { setIdentidad(null); return }
+    fetch(`/api/empresas/${empresaId}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        const id = data?.identidad as EmpresaIdentidadSnippet | null
+        setIdentidad(id)
+        if (!id) return
+        // Pre-fill solo si el campo está vacío
+        if (id.publicoObjetivo && !publicoObjetivo) setField("publicoObjetivo", id.publicoObjetivo)
+        if (id.tono && !tonoYestilo) setField("tonoYestilo", id.tono)
+        if (id.propuestasValor && !propuestasValor) setField("propuestasValor", id.propuestasValor)
+        if (id.palabrasProhibidas && !queNOhacer) setField("queNOhacer", id.palabrasProhibidas)
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [empresaId])
 
   function buildPublico(edades: string[], genero: string, custom: string) {
     const parts: string[] = []
@@ -180,142 +214,228 @@ export default function Step2Brief() {
 
       {/* ── Contexto estratégico ─────────────────────────────────── */}
       <div className="pt-2 border-t border-border space-y-5">
-        <div>
-          <p className="text-sm font-semibold text-foreground">Contexto estratégico</p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Mientras más completes estos campos, mejor será el brief generado por IA. Todos son opcionales.
-          </p>
-        </div>
 
-        <Field label="Contexto de la campaña" hint="opcional">
-          <textarea
-            value={contextoCampana}
-            onChange={(e) => setField("contextoCampana", e.target.value)}
-            placeholder="¿Qué está pasando en el negocio? ¿Por qué esta campaña ahora? Ej. 'Lanzamiento de nueva línea, queremos posicionarla y aumentar participación de mercado'"
-            rows={2}
-            className="w-full px-4 py-2.5 rounded-lg border border-input bg-card text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring text-sm resize-none"
-          />
-        </Field>
-
-        <Field label="Objetivo de la campaña" hint="opcional">
-          <input
-            type="text"
-            value={objetivoCampana}
-            onChange={(e) => setField("objetivoCampana", e.target.value)}
-            placeholder="Ej. Aumentar ventas online 30% en mayo, generar 500 leads para evento presencial"
-            className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-          <Chips options={OBJETIVOS} value={objetivoCampana} onSelect={(v) => setField("objetivoCampana", v)} />
-        </Field>
-
-        <Field label="Público objetivo" hint="opcional">
-          <div className="space-y-2.5">
-            {/* Género */}
-            <div className="flex gap-2">
-              {GENEROS.map((g) => (
-                <button
-                  key={g}
-                  type="button"
-                  onClick={() => selectGenero(g)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-lg text-xs border font-medium transition-all",
-                    generoSelected === g
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border bg-muted/50 text-muted-foreground hover:border-primary/50 hover:text-foreground"
-                  )}
-                >
-                  {g}
-                </button>
-              ))}
+        {/* MODO LIGERO: empresa con identidad cargada */}
+        {modoLigero ? (
+          <>
+            {/* Banner identidad empresa */}
+            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-primary/5 border border-primary/20">
+              <BuildingIcon className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-primary">{empresaNombre} — perfil de IA cargado</p>
+                {identidad?.tono && (
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">Tono: {identidad.tono}</p>
+                )}
+                {identidad?.publicoObjetivo && (
+                  <p className="text-xs text-muted-foreground truncate">Público: {identidad.publicoObjetivo}</p>
+                )}
+              </div>
             </div>
-            {/* Edades */}
-            <div className="flex flex-wrap gap-1.5">
-              {EDADES.map((e) => (
-                <button
-                  key={e}
-                  type="button"
-                  onClick={() => toggleEdad(e)}
-                  className={cn(
-                    "px-2.5 py-1 rounded-full text-xs border transition-all",
-                    edadesSelected.includes(e)
-                      ? "border-primary bg-primary/10 text-primary font-medium"
-                      : "border-border bg-muted/50 text-muted-foreground hover:border-primary/50 hover:text-foreground"
-                  )}
-                >
-                  {e}
-                </button>
-              ))}
+
+            {/* Campos campaign-specific (prominentes) */}
+            <Field label="Contexto de la campaña" hint="opcional">
+              <textarea
+                value={contextoCampana}
+                onChange={(e) => setField("contextoCampana", e.target.value)}
+                placeholder="¿Qué está pasando en el negocio? ¿Por qué esta campaña ahora? Ej. 'Lanzamiento de nueva línea, queremos aumentar participación de mercado'"
+                rows={2}
+                className="w-full px-4 py-2.5 rounded-lg border border-input bg-card text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring text-sm resize-none"
+              />
+            </Field>
+
+            <Field label="Objetivo de la campaña" hint="opcional">
+              <input
+                type="text"
+                value={objetivoCampana}
+                onChange={(e) => setField("objetivoCampana", e.target.value)}
+                placeholder="Ej. Aumentar ventas online 30% en mayo, generar 500 leads"
+                className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <Chips options={OBJETIVOS} value={objetivoCampana} onSelect={(v) => setField("objetivoCampana", v)} />
+            </Field>
+
+            <Field label="Insight o mensaje clave" hint="opcional">
+              <input
+                type="text"
+                value={insightMensajeClave}
+                onChange={(e) => setField("insightMensajeClave", e.target.value)}
+                placeholder="Ej. 'El cliente sabe cuándo encontró exactamente lo que estaba buscando'"
+                className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </Field>
+
+            <Field label="Llamada a la acción (CTA)" hint="opcional">
+              <input
+                type="text"
+                value={llamadaAccion}
+                onChange={(e) => setField("llamadaAccion", e.target.value)}
+                placeholder="Ej. Compra ahora, Obtén el tuyo"
+                className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <Chips options={CTAS} value={llamadaAccion} onSelect={(v) => setField("llamadaAccion", v)} />
+            </Field>
+
+            {/* Overrides colapsables */}
+            <div className="rounded-xl border border-border overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setOverridesOpen((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+              >
+                <span>Ajustar tono, público o restricciones para esta campaña</span>
+                {overridesOpen ? <ChevronUpIcon className="w-4 h-4" /> : <ChevronDownIcon className="w-4 h-4" />}
+              </button>
+
+              {overridesOpen && (
+                <div className="border-t border-border p-4 space-y-4">
+                  <p className="text-xs text-muted-foreground">Estos campos sobreescriben el perfil de la empresa solo para esta campaña.</p>
+
+                  <Field label="Público objetivo (override)" hint="opcional">
+                    <div className="space-y-2.5">
+                      <div className="flex gap-2">
+                        {GENEROS.map((g) => (
+                          <button key={g} type="button" onClick={() => selectGenero(g)}
+                            className={cn("px-3 py-1.5 rounded-lg text-xs border font-medium transition-all",
+                              generoSelected === g ? "border-primary bg-primary/10 text-primary" : "border-border bg-muted/50 text-muted-foreground hover:border-primary/50 hover:text-foreground")}>
+                            {g}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {EDADES.map((e) => (
+                          <button key={e} type="button" onClick={() => toggleEdad(e)}
+                            className={cn("px-2.5 py-1 rounded-full text-xs border transition-all",
+                              edadesSelected.includes(e) ? "border-primary bg-primary/10 text-primary font-medium" : "border-border bg-muted/50 text-muted-foreground hover:border-primary/50 hover:text-foreground")}>
+                            {e}
+                          </button>
+                        ))}
+                      </div>
+                      <input type="text" value={publicoCustom} onChange={(e) => handlePublicoCustom(e.target.value)}
+                        placeholder="Detalle adicional: NSE, ubicación, intereses…"
+                        className="w-full h-9 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring" />
+                      {publicoObjetivo && (
+                        <p className="text-xs text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-lg">→ {publicoObjetivo}</p>
+                      )}
+                    </div>
+                  </Field>
+
+                  <Field label="Tono y estilo (override)" hint="opcional">
+                    <input type="text" value={tonoYestilo} onChange={(e) => setField("tonoYestilo", e.target.value)}
+                      placeholder="Ej. Más urgente que el tono habitual de la marca"
+                      className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring" />
+                    <Chips options={TONOS} value={tonoYestilo} onSelect={(v) => setField("tonoYestilo", v)} />
+                  </Field>
+
+                  <Field label="Propuestas de valor (override)" hint="opcional">
+                    <textarea value={propuestasValor} onChange={(e) => setField("propuestasValor", e.target.value)}
+                      placeholder="Solo si quieres destacar algo específico de esta campaña"
+                      rows={2}
+                      className="w-full px-4 py-2.5 rounded-lg border border-input bg-card text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring text-sm resize-none" />
+                  </Field>
+
+                  <Field label="Qué NO hacer en esta campaña" hint="opcional">
+                    <input type="text" value={queNOhacer} onChange={(e) => setField("queNOhacer", e.target.value)}
+                      placeholder="Restricciones adicionales para esta campaña específica"
+                      className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring" />
+                  </Field>
+                </div>
+              )}
             </div>
-            {/* Detalle libre */}
-            <input
-              type="text"
-              value={publicoCustom}
-              onChange={(e) => handlePublicoCustom(e.target.value)}
-              placeholder="Detalle adicional: NSE, ubicación, intereses, etc."
-              className="w-full h-9 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-            {/* Preview */}
-            {publicoObjetivo && (
-              <p className="text-xs text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-lg">
-                → {publicoObjetivo}
-              </p>
-            )}
-          </div>
-        </Field>
 
-        <Field label="Insight o mensaje clave" hint="opcional">
-          <input
-            type="text"
-            value={insightMensajeClave}
-            onChange={(e) => setField("insightMensajeClave", e.target.value)}
-            placeholder="Ej. 'El cliente sabe cuándo encontró exactamente lo que estaba buscando'"
-            className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-        </Field>
+            <p className="text-xs text-muted-foreground text-center">
+              Todos los campos son opcionales — puedes continuar y la IA usará el perfil de {empresaNombre}.
+            </p>
+          </>
+        ) : (
+          /* MODO COMPLETO: sin empresa seleccionada */
+          <>
+            <div>
+              <p className="text-sm font-semibold text-foreground">Contexto estratégico</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Todos los campos son opcionales — mientras más completes, mejor será el brief de IA.</p>
+            </div>
 
-        <Field label="Propuestas de valor de la marca" hint="opcional">
-          <textarea
-            value={propuestasValor}
-            onChange={(e) => setField("propuestasValor", e.target.value)}
-            placeholder="Ej. Calidad premium, servicio personalizado, garantía, envío rápido, precio justo"
-            rows={2}
-            className="w-full px-4 py-2.5 rounded-lg border border-input bg-card text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring text-sm resize-none"
-          />
-        </Field>
+            <Field label="Contexto de la campaña" hint="opcional">
+              <textarea
+                value={contextoCampana}
+                onChange={(e) => setField("contextoCampana", e.target.value)}
+                placeholder="¿Qué está pasando en el negocio? ¿Por qué esta campaña ahora?"
+                rows={2}
+                className="w-full px-4 py-2.5 rounded-lg border border-input bg-card text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring text-sm resize-none"
+              />
+            </Field>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Tono y estilo" hint="opcional">
-            <input
-              type="text"
-              value={tonoYestilo}
-              onChange={(e) => setField("tonoYestilo", e.target.value)}
-              placeholder="Ej. Cercano, aspiracional, sin tecnicismos"
-              className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-            <Chips options={TONOS} value={tonoYestilo} onSelect={(v) => setField("tonoYestilo", v)} />
-          </Field>
+            <Field label="Objetivo de la campaña" hint="opcional">
+              <input type="text" value={objetivoCampana} onChange={(e) => setField("objetivoCampana", e.target.value)}
+                placeholder="Ej. Aumentar ventas online 30% en mayo, generar 500 leads"
+                className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring" />
+              <Chips options={OBJETIVOS} value={objetivoCampana} onSelect={(v) => setField("objetivoCampana", v)} />
+            </Field>
 
-          <Field label="Llamada a la acción (CTA)" hint="opcional">
-            <input
-              type="text"
-              value={llamadaAccion}
-              onChange={(e) => setField("llamadaAccion", e.target.value)}
-              placeholder="Ej. Compra ahora, Obtén el tuyo"
-              className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-            <Chips options={CTAS} value={llamadaAccion} onSelect={(v) => setField("llamadaAccion", v)} />
-          </Field>
-        </div>
+            <Field label="Público objetivo" hint="opcional">
+              <div className="space-y-2.5">
+                <div className="flex gap-2">
+                  {GENEROS.map((g) => (
+                    <button key={g} type="button" onClick={() => selectGenero(g)}
+                      className={cn("px-3 py-1.5 rounded-lg text-xs border font-medium transition-all",
+                        generoSelected === g ? "border-primary bg-primary/10 text-primary" : "border-border bg-muted/50 text-muted-foreground hover:border-primary/50 hover:text-foreground")}>
+                      {g}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {EDADES.map((e) => (
+                    <button key={e} type="button" onClick={() => toggleEdad(e)}
+                      className={cn("px-2.5 py-1 rounded-full text-xs border transition-all",
+                        edadesSelected.includes(e) ? "border-primary bg-primary/10 text-primary font-medium" : "border-border bg-muted/50 text-muted-foreground hover:border-primary/50 hover:text-foreground")}>
+                      {e}
+                    </button>
+                  ))}
+                </div>
+                <input type="text" value={publicoCustom} onChange={(e) => handlePublicoCustom(e.target.value)}
+                  placeholder="Detalle adicional: NSE, ubicación, intereses, etc."
+                  className="w-full h-9 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring" />
+                {publicoObjetivo && (
+                  <p className="text-xs text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-lg">→ {publicoObjetivo}</p>
+                )}
+              </div>
+            </Field>
 
-        <Field label="Qué NO hacer / palabras prohibidas" hint="opcional">
-          <input
-            type="text"
-            value={queNOhacer}
-            onChange={(e) => setField("queNOhacer", e.target.value)}
-            placeholder="Ej. No mencionar precio antes de mostrar el producto, evitar 'barato', no nombrar competidores"
-            className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-        </Field>
+            <Field label="Insight o mensaje clave" hint="opcional">
+              <input type="text" value={insightMensajeClave} onChange={(e) => setField("insightMensajeClave", e.target.value)}
+                placeholder="Ej. 'El cliente sabe cuándo encontró exactamente lo que estaba buscando'"
+                className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring" />
+            </Field>
+
+            <Field label="Propuestas de valor de la marca" hint="opcional">
+              <textarea value={propuestasValor} onChange={(e) => setField("propuestasValor", e.target.value)}
+                placeholder="Ej. Calidad premium, servicio personalizado, garantía, envío rápido, precio justo"
+                rows={2}
+                className="w-full px-4 py-2.5 rounded-lg border border-input bg-card text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring text-sm resize-none" />
+            </Field>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Tono y estilo" hint="opcional">
+                <input type="text" value={tonoYestilo} onChange={(e) => setField("tonoYestilo", e.target.value)}
+                  placeholder="Ej. Cercano, aspiracional, sin tecnicismos"
+                  className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring" />
+                <Chips options={TONOS} value={tonoYestilo} onSelect={(v) => setField("tonoYestilo", v)} />
+              </Field>
+
+              <Field label="Llamada a la acción (CTA)" hint="opcional">
+                <input type="text" value={llamadaAccion} onChange={(e) => setField("llamadaAccion", e.target.value)}
+                  placeholder="Ej. Compra ahora, Obtén el tuyo"
+                  className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring" />
+                <Chips options={CTAS} value={llamadaAccion} onSelect={(v) => setField("llamadaAccion", v)} />
+              </Field>
+            </div>
+
+            <Field label="Qué NO hacer / palabras prohibidas" hint="opcional">
+              <input type="text" value={queNOhacer} onChange={(e) => setField("queNOhacer", e.target.value)}
+                placeholder="Ej. No mencionar precio antes de mostrar el producto, evitar 'barato'"
+                className="w-full h-10 px-3 rounded-lg border border-input bg-card text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring" />
+            </Field>
+          </>
+        )}
       </div>
     </div>
   )

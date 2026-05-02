@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { ChevronRightIcon, ChevronLeftIcon, UserIcon, FilterIcon, XIcon } from "lucide-react"
+import { ChevronRightIcon, ChevronLeftIcon, UserIcon, FilterIcon, XIcon, KanbanIcon, UsersIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import PieceDrawer from "./PieceDrawer"
 
@@ -15,8 +15,33 @@ interface Piece {
   formato: string | null
   taskStatus: string
   estado: string
+  priority: string | null
+  dueDate: Date | null
   adSet: { nombre: string; campaign: { id: string; name: string } }
   assignee: { id: string; name: string } | null
+}
+
+const PRIORITY_STYLE: Record<string, string> = {
+  URGENTE: "bg-red-100 text-red-700 border-red-200",
+  ALTA:    "bg-orange-100 text-orange-700 border-orange-200",
+  MEDIA:   "bg-blue-100 text-blue-700 border-blue-200",
+  BAJA:    "bg-muted text-muted-foreground border-border",
+}
+
+function DueDateBadge({ dueDate, taskStatus }: { dueDate: Date | null; taskStatus: string }) {
+  if (!dueDate) return null
+  const done = ["APROBADO", "PUBLICADO"].includes(taskStatus)
+  if (done) return null
+  const now = Date.now()
+  const due = new Date(dueDate).getTime()
+  const diffDays = Math.ceil((due - now) / 86400000)
+  if (diffDays < 0)
+    return <span className="text-[10px] font-semibold text-destructive">Vencida hace {Math.abs(diffDays)}d</span>
+  if (diffDays === 0)
+    return <span className="text-[10px] font-semibold text-orange-600">Vence hoy</span>
+  if (diffDays <= 3)
+    return <span className="text-[10px] font-semibold text-amber-600">Vence en {diffDays}d</span>
+  return <span className="text-[10px] text-muted-foreground">{diffDays}d restantes</span>
 }
 
 interface Member { id: string; name: string; role: string }
@@ -98,6 +123,18 @@ function PieceCard({
         loading && "opacity-60 pointer-events-none"
       )}
     >
+      {/* Priority + due date row */}
+      {(piece.priority || piece.dueDate) && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {piece.priority && (
+            <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded border", PRIORITY_STYLE[piece.priority] ?? PRIORITY_STYLE.BAJA)}>
+              {piece.priority}
+            </span>
+          )}
+          <DueDateBadge dueDate={piece.dueDate} taskStatus={piece.taskStatus} />
+        </div>
+      )}
+
       <p className="text-xs font-semibold text-foreground leading-snug">
         {piece.modelo || "Sin modelo"} · {piece.tipoPieza || "Sin tipo"}
       </p>
@@ -207,13 +244,86 @@ function FiltersBar({
   )
 }
 
+// ─── Workload view ────────────────────────────────────────────────────────────
+
+const STATUS_LABEL_SHORT: Record<string, string> = {
+  PENDIENTE: "Pend.", EN_PRODUCCION: "En prod.", EN_REVISION: "En rev.",
+  APROBADO: "Aprob.", PUBLICADO: "Pub.", RECHAZADO: "Rech.",
+}
+const STATUS_DOT: Record<string, string> = {
+  PENDIENTE: "bg-muted-foreground/40", EN_PRODUCCION: "bg-blue-400",
+  EN_REVISION: "bg-amber-400", APROBADO: "bg-emerald-400",
+  PUBLICADO: "bg-purple-400", RECHAZADO: "bg-destructive",
+}
+
+function WorkloadView({ pieces, members }: { pieces: Piece[]; members: Member[] }) {
+  const workload = useMemo(() => {
+    const map = new Map<string, { member: Member; pieces: Piece[] }>()
+    for (const m of members) map.set(m.id, { member: m, pieces: [] })
+    const unassigned: Piece[] = []
+    for (const p of pieces) {
+      if (p.assignee) map.get(p.assignee.id)?.pieces.push(p)
+      else unassigned.push(p)
+    }
+    const rows = Array.from(map.values()).filter(r => r.pieces.length > 0)
+    if (unassigned.length > 0) rows.push({ member: { id: "unassigned", name: "Sin asignar", role: "" }, pieces: unassigned })
+    return rows.sort((a, b) => b.pieces.length - a.pieces.length)
+  }, [pieces, members])
+
+  return (
+    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+      {workload.map(({ member, pieces: mp }) => {
+        const active = mp.filter(p => ["EN_PRODUCCION", "EN_REVISION"].includes(p.taskStatus)).length
+        const overdue = mp.filter(p => p.dueDate && new Date(p.dueDate) < new Date() && !["APROBADO", "PUBLICADO"].includes(p.taskStatus)).length
+        const load = mp.length > 7 ? "Alta" : mp.length > 4 ? "Media" : "Baja"
+        const loadColor = load === "Alta" ? "text-destructive bg-destructive/10" : load === "Media" ? "text-amber-700 bg-amber-50" : "text-emerald-700 bg-emerald-50"
+
+        const byStatus = mp.reduce((acc, p) => { acc[p.taskStatus] = (acc[p.taskStatus] ?? 0) + 1; return acc }, {} as Record<string, number>)
+
+        return (
+          <div key={member.id} className="bg-card border border-border rounded-2xl p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <span className="text-xs font-bold text-primary uppercase">
+                  {member.name === "Sin asignar" ? "?" : member.name.charAt(0)}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-foreground">{member.name}</p>
+                <p className="text-[11px] text-muted-foreground">{active} activas · {mp.length} asignadas{overdue > 0 ? ` · ⚠ ${overdue} vencidas` : ""}</p>
+              </div>
+              <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-md", loadColor)}>
+                {load}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(byStatus).map(([status, count]) => (
+                <div key={status} className="flex items-center gap-1">
+                  <span className={cn("w-1.5 h-1.5 rounded-full", STATUS_DOT[status] ?? "bg-muted-foreground/30")} />
+                  <span className="text-[10px] text-muted-foreground">{STATUS_LABEL_SHORT[status] ?? status} ({count})</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+      {workload.length === 0 && (
+        <div className="flex items-center justify-center py-20 text-muted-foreground text-sm">Sin piezas asignadas.</div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
+
+type ViewMode = "kanban" | "workload"
 
 export default function BoardKanban({ pieces, members, currentUserId, currentUserRole }: Props) {
   const [openPieceId, setOpenPieceId] = useState<string | null>(null)
   const [filterCampaign, setFilterCampaign] = useState("")
   const [filterAssignee, setFilterAssignee] = useState("")
   const [filterEstado, setFilterEstado] = useState("")
+  const [viewMode, setViewMode] = useState<ViewMode>("kanban")
 
   const canAdvance = ["OWNER", "SUPER_ADMIN", "CREATIVO", "TRAFFICKER"].includes(currentUserRole)
   const canAssign = ["OWNER", "SUPER_ADMIN"].includes(currentUserRole)
@@ -253,16 +363,31 @@ export default function BoardKanban({ pieces, members, currentUserId, currentUse
             <h1 className="text-xl font-semibold text-foreground">Board</h1>
             <p className="text-sm text-muted-foreground mt-0.5">{filtered.length} piezas</p>
           </div>
-          <div className="flex gap-4 text-xs text-muted-foreground">
-            <span><span className="font-semibold text-blue-600">{enProduccion}</span> en prod.</span>
-            <span><span className="font-semibold text-amber-600">{enRevision}</span> en revisión</span>
-            <span><span className="font-semibold text-emerald-600">{aprobadas}</span> aprobadas</span>
+          <div className="flex items-center gap-4">
+            <div className="flex gap-4 text-xs text-muted-foreground">
+              <span><span className="font-semibold text-blue-600">{enProduccion}</span> en prod.</span>
+              <span><span className="font-semibold text-amber-600">{enRevision}</span> en revisión</span>
+              <span><span className="font-semibold text-emerald-600">{aprobadas}</span> aprobadas</span>
+            </div>
+            <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+              <button onClick={() => setViewMode("kanban")} title="Vista Kanban"
+                className={cn("p-1.5 rounded-md transition-colors", viewMode === "kanban" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}>
+                <KanbanIcon className="w-3.5 h-3.5" />
+              </button>
+              <button onClick={() => setViewMode("workload")} title="Vista Carga"
+                className={cn("p-1.5 rounded-md transition-colors", viewMode === "workload" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}>
+                <UsersIcon className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Workload view */}
+      {viewMode === "workload" && <WorkloadView pieces={filtered} members={members} />}
+
       {/* Filters */}
-      <FiltersBar
+      {viewMode === "kanban" && <FiltersBar
         campaigns={campaigns}
         members={members}
         filterCampaign={filterCampaign}
@@ -271,10 +396,10 @@ export default function BoardKanban({ pieces, members, currentUserId, currentUse
         onCampaign={setFilterCampaign}
         onAssignee={setFilterAssignee}
         onEstado={setFilterEstado}
-      />
+      />}
 
       {/* Kanban */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden">
+      {viewMode === "kanban" && <div className="flex-1 overflow-x-auto overflow-y-hidden">
         <div className="flex gap-4 h-full px-6 py-4" style={{ minWidth: `${COLUMNS.length * 224}px` }}>
           {COLUMNS.map((col) => {
             const cards = byStatus[col.key] ?? []
@@ -307,7 +432,7 @@ export default function BoardKanban({ pieces, members, currentUserId, currentUse
             )
           })}
         </div>
-      </div>
+      </div>}
 
       {/* Piece Drawer */}
       <PieceDrawer

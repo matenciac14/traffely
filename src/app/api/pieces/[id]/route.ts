@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth/config"
 import { db } from "@/lib/db/prisma"
 import { getDownloadUrl } from "@/lib/s3/client"
+import { logger } from "@/lib/logger"
 
 export async function GET(
   _req: Request,
@@ -19,7 +20,7 @@ export async function GET(
       modelo: true, tipoPieza: true, formato: true, duracion: true,
       angulo: true, trafico: true, conciencia: true, motivo: true, narrativa: true,
       estructuraCopy: true, estado: true, taskStatus: true,
-      guionGenerado: true, copyGenerado: true, aiGeneratedAt: true,
+      guionGenerado: true, copyGenerado: true, imageBriefGenerado: true, aiGeneratedAt: true,
       archivoUrl: true, archivoKey: true,
       priority: true, dueDate: true, adUrl: true,
       createdAt: true, updatedAt: true,
@@ -39,7 +40,9 @@ export async function GET(
   if (piece.archivoKey) {
     try {
       archivoSignedUrl = await getDownloadUrl(piece.archivoKey)
-    } catch { /* ignore */ }
+    } catch (err) {
+      logger.error("GET /api/pieces/[id] presigned URL", err, { pieceId: piece.id, archivoKey: piece.archivoKey })
+    }
   }
 
   return NextResponse.json({ ...piece, archivoSignedUrl })

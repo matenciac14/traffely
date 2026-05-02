@@ -17,15 +17,8 @@ export function generarPromptMaestro(state: CampaignWizardState): string {
       ? state.otraOferta
       : OFERTA_LABEL_MAP[state.tipoOferta] || "No definida"
 
-  // Contexto especial Primatón
-  let contextoEspecial = ""
-  if (evento && evento.includes("Primatón")) {
-    contextoEspecial = `
-CONTEXTO ESPECIAL · PRIMATÓN:
-La Primatón aprovecha el pago legal de primas en Colombia (30 junio y 20 diciembre).
-Los ángulos deben conectar con liquidez extra, darse el gusto merecido, aprovechar la prima.
-`
-  }
+  // Contexto de evento especial (viene del nombre del evento, no hardcodeado)
+  const contextoEspecial = ""
 
   // Detectar si hay videos
   let hayVideos = false
@@ -38,11 +31,11 @@ Los ángulos deben conectar con liquidez extra, darse el gusto merecido, aprovec
     )
   )
 
-  // Modelos con precios
-  const modelosConPrecios = state.modelosSeleccionados
+  // Productos con precios
+  const modelosConPrecios = state.productosSeleccionados
     .map((m) => {
-      const precio = state.preciosModelos[m] || {}
-      const desc = state.modelosDescripcion[m] || ""
+      const precio = state.preciosProductos[m] || {}
+      const desc = state.productosDescripcion[m] || ""
       let linea = ""
       if (precio.antes || precio.ahora) {
         const antes = precio.antes ? `$${formatMoney(precio.antes)}` : ""
@@ -68,14 +61,25 @@ Los ángulos deben conectar con liquidez extra, darse el gusto merecido, aprovec
 - Tipo: ${tipoCamp}${evento ? ` · ${evento}` : ""}
 
 ## 2 · CONTEXTO DEL BRIEF
+${state.empresaId
+  ? `(Identidad de la empresa disponible en el contexto del sistema — tono, público base, propuestas de valor y restricciones ya incluidos.)`
+  : ""}
 - Contexto de la campaña: ${state.contextoCampana || "(No especificado)"}
 - Objetivo de la campaña: ${state.objetivoCampana || "(No especificado)"}
-- Público objetivo: ${state.publicoObjetivo || "(No especificado)"}
+- Público objetivo para esta campaña: ${state.publicoObjetivo || (state.empresaId ? "(usar perfil de empresa)" : "(No especificado)")}
 - Insight / Mensaje clave: ${state.insightMensajeClave || "(No especificado)"}
+- Llamada a la acción: ${state.llamadaAccion || "(No especificada)"}${
+  !state.empresaId ? `
 - Propuestas de valor de la marca: ${state.propuestasValor || "(No especificado)"}
 - Tono y estilo: ${state.tonoYestilo || "(No especificado)"}
-- Llamada a la acción: ${state.llamadaAccion || "(No especificada)"}
-- Qué NO hacer: ${state.queNOhacer || "(No especificado)"}
+- Qué NO hacer: ${state.queNOhacer || "(No especificado)"}` : `${
+  state.tonoYestilo ? `\n- Tono para esta campaña (override): ${state.tonoYestilo}` : ""
+}${
+  state.propuestasValor ? `\n- Propuestas de valor destacadas en esta campaña: ${state.propuestasValor}` : ""
+}${
+  state.queNOhacer ? `\n- Restricciones adicionales para esta campaña: ${state.queNOhacer}` : ""
+}`
+}
 
 ## 3 · OFERTA
 - Tipo: ${ofertaDesc}
@@ -86,10 +90,21 @@ Los ángulos deben conectar con liquidez extra, darse el gusto merecido, aprovec
 - Cambios de producto: ${state.ofertaCambios || "(No especificados)"}
 - Envío: ${state.ofertaEnvio || "(No especificado)"}
 ${contextoEspecial}
-## 4 · MODELOS DISPONIBLES CON PRECIOS
+## 4 · PRODUCTOS DISPONIBLES CON PRECIOS
 ${modelosConPrecios}
 
-## 5 · ESTRUCTURA META ADS
+## 5 · CONCEPTOS CREATIVOS SELECCIONADOS
+${(() => {
+    const seleccionados = (state.conceptos ?? []).filter(c => c.isSelected)
+    if (seleccionados.length === 0) return "(Ningún concepto seleccionado — generación libre)"
+    return seleccionados.map((c, i) =>
+      `### Concepto ${i + 1}: ${c.nombre}\n- Hipótesis: ${c.hipotesis || "(sin hipótesis)"}\n- Ángulo: ${c.anguloMensajeria || "(sin ángulo)"}\n- Framework: ${c.frameworkCopy || "(sin framework)"}\n- Dirección visual: ${c.direccionVisual || "(sin dirección)"}`
+    ).join("\n\n")
+  })()}
+
+INSTRUCCIÓN: Cada pieza DEBE alinearse con alguno de los conceptos seleccionados arriba. El concepto define el ángulo, el framework de copy y la dirección visual — el copy generado debe ser fiel a él.
+
+## 6 · ESTRUCTURA META ADS
 - Objetivo del brief: ${state.objetivo}
 - Tipo de presupuesto: ${state.tipoPresupuesto} ${state.tipoPresupuesto === "ABO" ? "(presupuesto por conjunto — manual)" : "(presupuesto global — Meta optimiza)"}
 
@@ -106,8 +121,8 @@ ${modelosConPrecios}
 
       conj.piezas.forEach((p, pi) => {
         const cu = p._customs || {}
-        const modeloFinal = val(p.modelo, cu.modelo)
-        const precio = state.preciosModelos[modeloFinal]
+        const modeloFinal = val(p.producto, cu.producto)
+        const precio = state.preciosProductos[modeloFinal]
         let precioStr = ""
         if (precio && (precio.antes || precio.ahora)) {
           if (precio.antes && precio.ahora)
@@ -132,153 +147,54 @@ ${modelosConPrecios}
   })
 
   prompt += `
-## 6 · PRESUPUESTO
+## 7 · PRESUPUESTO
 - Modo: ${state.presupuestoModo}
 - Valor ${state.presupuestoModo}: $${formatMoney(state.presupuestoValor)} COP
 - Fecha inicio: ${state.fechaInicio || "No definida"}
 - Fecha fin: ${state.sinFechaFin ? "SIN FECHA FIN (evergreen)" : state.fechaFin || "No definida"}
 
-## 7 · EQUIPO
-${state.equipo.filter((e) => e.rol && e.email).map((e) => `- ${e.rol}: ${e.email}`).join("\n")}
-
 # ═══════════════════════════════════════════════════════════
 # INSTRUCCIONES PARA CLAUDE
 # ═══════════════════════════════════════════════════════════
 
-Actúa como el director creativo y copywriter senior de ${state.empresa}.
+Actúas como el director creativo y copywriter senior de ${state.empresa}.
 
-## FORMATO DE ENTREGA: DOCUMENTO WORD (.docx)
+## FORMATO DE SALIDA: JSON ESTRUCTURADO
 
-Entrega el brief completo como un archivo Microsoft Word (.docx).
+Devuelve EXCLUSIVAMENTE un objeto JSON válido. Cero texto antes o después del JSON.
+El JSON debe ser parseable: sin comas trailing, sin comentarios, caracteres especiales correctamente escapados.
 
-# ═══════════════════════════════════════════════════════════
-# TEMPLATE FIJO DEL WORD · NO NEGOCIABLE
-# ═══════════════════════════════════════════════════════════
+Estructura exacta:
 
-Esta estructura del Word debe ser EXACTAMENTE la misma en cada ejecución del brief.
-Solo varía el contenido creativo (guiones, copys, hooks). La ESTRUCTURA Y DISEÑO son fijos.
-
-## ESPECIFICACIONES GLOBALES DEL WORD
-
-- Tamaño: US Letter (12240 × 15840 DXA)
-- Márgenes: 1 pulgada en todos los lados
-- Tipografía: Arial en todo el documento
-- Paleta obligatoria:
-  * Grafito principal: #333333
-  * Carbón: #4B4441
-  * Crema (fondos suaves): #FAFAF9
-  * Dorado (acentos): #C8A47E
-  * Verde salvia (copy box): #8FA68E
-  * Borde: #D8D4D0
-  * Plata (footers): #BBB4B1
-
-- Header (todas las páginas): "${state.empresa.toUpperCase()} · CAMPAIGN BRIEF" en color plata, letter-spacing 40, alineación derecha, 14pt.
-- Footer (todas las páginas): "[Nombre campaña]  ·  Pág. X de Y" centrado, color plata, borde superior sutil.
-
-## ESTRUCTURA DEL WORD · 12 SECCIONES EXACTAS
-
-### PÁGINA 1 · PORTADA
-1. Espaciado superior (before: 2400)
-2. Logo centrado (200×120 px). Si no hay, espacio equivalente.
-3. Texto "${state.empresa.toUpperCase()}" centrado, 20pt, color carbón, letter-spacing 80
-4. Línea dorada como separador
-5. Texto "CAMPAIGN BRIEF" centrado, 18pt, color plata, letter-spacing 60
-6. Espaciado (after: 1440)
-7. NOMBRE DE LA CAMPAÑA en 64pt bold, color grafito, centrado
-8. Subtítulo "Brief creativo · Guiones · Copy para Meta Ads" en 24pt, italic, color carbón
-9. Espaciado inferior (after: 2400)
-10. NOMBRE EMPRESA en 16pt bold, color dorado, letter-spacing 100, centrado
-11. "Generado el ${fecha}" en 18pt, color plata, centrado
-12. Salto de página
-
-### PÁGINA 2 · ÍNDICE
-- Título "Contenido" en H1 (40pt bold)
-- Separador dorado horizontal
-- 10 líneas de índice con formato "  XX  ·  Nombre" en bold
-- Salto de página
-
-### SECCIÓN 01 · RESUMEN EJECUTIVO
-- Label "SECCIÓN 01" en dorado 16pt bold uppercase
-- Título "Resumen ejecutivo" H1
-- Separador dorado
-- Tabla 2 columnas con Campaña, Tipo, Objetivo Meta, Presupuesto, Periodo, Estructura, Modelos foco
-- Salto de página
-
-### SECCIÓN 02 · CONTEXTO Y OBJETIVOS
-- Label + H1 + Separador dorado
-- H3 "Contexto de la campaña" + párrafo
-- H3 "Objetivo principal" + párrafo
-- H3 "KPIs a monitorear" + 6 bullets
-- Salto de página
-
-### SECCIÓN 03 · OFERTA COMERCIAL
-- Label + H1 + Separador dorado
-- H3 "La oferta" + párrafo + bullets
-- H3 "Condiciones importantes" + tabla
-- H3 "Tabla de precios por modelo" + tabla con encabezado grafito
-- Salto de página
-
-### SECCIÓN 04 · PÚBLICO OBJETIVO
-- Label + H1 + Separador dorado
-- H3 "Perfil demográfico" + bullets
-- H3 "Perfil psicográfico" + bullets
-- H3 "Momento emocional clave" + párrafo
-- Salto de página
-
-### SECCIÓN 05 · INSIGHT Y MENSAJE CLAVE
-- Label + H1 + Separador dorado
-- H3 "El insight estratégico" + párrafo
-- BLOCKQUOTE con barra lateral dorada #C8A47E, fondo crema, texto 24pt italic carbón
-- H3 "Por qué funciona" + bullets
-- Salto de página
-
-### SECCIÓN 06 · PROPUESTA DE VALOR
-- Label + H1 + Separador dorado
-- H3 "Propuestas duras (funcionales)" + bullets
-- H3 "Propuestas blandas (emocionales)" + bullets
-- Salto de página
-
-### SECCIÓN 07 · TONO Y LENGUAJE
-- Label + H1 + Separador dorado
-- H3 "Tono general" + párrafo
-- H3 "Lenguaje que SÍ usamos" + bullets
-- H3 "Lenguaje que NO usamos" + bullets
-- Salto de página
-
-### SECCIÓN 08 · ESTRUCTURA META ADS
-- Label + H1 + Separador dorado
-- H3 "Configuración general" + tabla
-- Por cada campaña: H3 + tabla de conjuntos con Público, Piezas, Modelos, Ángulos
-- Salto de página
-
-### SECCIÓN 09 · GUIONES Y COPYS POR PIEZA
-Por CADA PIEZA en orden exacto:
-
-1. H2 "PIEZA [ID] · [Modelo] · [Tipo] · [Duración si video]"
-2. H3 "Tabla de atributos" + tabla 2 col con 12 filas (Modelo, Tipo, Formato, Ángulo, Tráfico, Conciencia, Motivo, Narrativa, Estructura copy, Duración, Registro de voz, Tipo de hook)
-3. H3 "Justificación del registro y hook" + 2 bullets
-4. H3 "📹 Guion del video" (o "🖼️ Brief visual" si imagen/carrusel)
-5. Si video: tabla timestamps (HOOK fondo dorado / Bloque 2 crema / Bloque 3 crema / CTA fondo grafito blanco)
-6. Si imagen/carrusel: tabla brief visual
-7. H3 "Estructura [X] aplicada" + 3 bullets
-8. H3 "Indicaciones de producción" + bullets
-9. H3 "📝 Copy del Ad (Meta Ads Manager)"
-10. Label "Primary Text:" en dorado bold
-11. CAJA CREMA con barra lateral verde salvia #8FA68E (4-6 párrafos del Primary Text)
-12. Tabla 3 col: Headline 1 + conteo / Headline 2 (≤27 chars) / Descripción / CTA botón
-13. H3 "🔍 Checklist de verificaciones" + 12 bullets
-14. Salto de página después de cada pieza
-
-### SECCIÓN 10 · ESPECIFICACIONES TÉCNICAS
-- Label + H1 + Separador dorado
-- H3 "Formatos de entrega" + tabla
-- H3 "Requisitos Meta Ads Manager" + bullets
-- H3 "Flujo de aprobación" + tabla
-- Separador dorado final + crédito generador
-
-## INSTRUCCIÓN ABSOLUTA
-
-Esta estructura es NO NEGOCIABLE. La ESTRUCTURA debe ser IDÉNTICA en cada ejecución. Lo que varía es el contenido creativo únicamente.
+{
+  "resumen": {
+    "objetivo": "<objetivo principal de la campaña en 1 oración clara>",
+    "insight": "<el insight central que conecta con el público objetivo>",
+    "estrategia": "<enfoque creativo global y por qué funcionará, 2-3 oraciones>",
+    "totalPiezas": <número entero>,
+    "totalCopys": <número entero — igual a totalPiezas>
+  },
+  "piezas": [
+    {
+      "id": "<ID exacto de la pieza del brief, ej: P-01-A-01>",
+      "modelo": "<nombre del modelo/producto>",
+      "tipoPieza": "<Video / Imagen / Carrusel>",
+      "angulo": "<ángulo asignado en el brief>",
+      "hookTipo": "<tipo de hook seleccionado de la lista>",
+      "hookApertura": "<las primeras palabras exactas del hook — lo que abre la pieza>",
+      "framework": "<PAS / AIDA / FAB / BAB / Storytelling>",
+      "registroVoz": "<Juvenil Gen Z / Coloquial colombiano / Formal-cálido / Neutro informativo / Emotivo directo / Cómplice>",
+      "primaryText": "<copy completo y real del Primary Text para Meta Ads, listo para publicar — máximo 125 caracteres óptimo>",
+      "headline": "<headline principal, máximo 40 caracteres, gancho en primeras 3 palabras>",
+      "descripcion": "<descripción del ad, máximo 30 caracteres>",
+      "varianteB_primaryText": "<segunda variante de primary text con distinto ángulo o registro de voz — máximo 125 caracteres>",
+      "varianteB_headline": "<headline alternativo, máximo 40 caracteres>",
+      "guionResumen": "<para video: guión condensado en 3-4 líneas con tiempos (HOOK 0-5s / Desarrollo / CTA). Para imagen/carrusel: brief visual de lo que debe verse>",
+      "imageBrief": "<prompt de generación de imagen/video: composición, colores hex, mood, metáfora visual, safe zones (máx 80 palabras, sin texto ni nombres de fuentes)>",
+      "justificacion": "<por qué este ángulo, hook y framework son los correctos para esta pieza específica, 1-2 oraciones>"
+    }
+  ]
+}
 
 # ═══════════════════════════════════════════════════════════
 # MÓDULO DE REDACCIÓN PROFESIONAL
@@ -299,34 +215,28 @@ Referencia:
 - BAB: Before → After → Bridge
 - 4U: Útil + Urgente + Único + Específico
 - Storytelling: Personaje + conflicto + transformación + CTA
+- Star-Story-Solution: Presenta al protagonista (Star) → Narra el conflicto (Story) → Revela la solución (Solution) + CTA
 
 ## DIVERSIFICACIÓN DE REGISTROS DE VOZ
 
 NO redactar todas las piezas con el mismo registro. Si hay 4+ piezas, asignar al menos 3 registros distintos:
-- Juvenil Gen Z (22-30)
-- Coloquial colombiano cálido (30-50)
+- Juvenil (18-30)
+- Coloquial cálido (30-50)
 - Formal-cálido (35-60)
 - Neutro informativo
 - Emotivo directo
-- Cómplice/amiga
+- Cómplice/cercano
 
-## REGLAS LEGALES Y ÉTICAS (NUNCA VIOLAR)
+El registro exacto y el dialecto regional se define en el perfil de tono de la empresa.
 
-PROHIBIDO ABSOLUTO:
-❌ "original", "originales"
-❌ "triple A", "AAA"
-❌ "importado", "importados"
-❌ "réplica", "imitación", "copia", "fake"
-❌ Mencionar marcas competidoras
-❌ Inventar cifras sociales o reviews
-❌ Prometer tiempos nacionales absolutos
-❌ Denigrar al comprador
+## REGLAS LEGALES Y ÉTICAS
 
-USAR EN SU LUGAR:
-✅ "calidad garantizada"
-✅ "materiales premium"
-✅ "construcción duradera"
-✅ "24-72h en ciudades principales"
+Las restricciones específicas de la industria vienen del perfil de la empresa (system prompt).
+Reglas universales:
+- No mencionar marcas competidoras
+- No inventar cifras, reviews ni testimonios
+- No hacer promesas absolutas sin respaldo
+- No denigrar al comprador
 
 ## DIVERSIDAD OBLIGATORIA ENTRE PIEZAS
 
@@ -368,7 +278,7 @@ Principios:
 ☐ Precio real del cliente
 ☐ Tiempos matizados
 ☐ CTA corresponde al objetivo
-☐ Headlines ≤27 caracteres
+☐ Headlines ≤40 caracteres
 ☐ Modismos coinciden con edad target
 ☐ Ángulo en primeros segundos
 ☐ Hook declarado y justificado
@@ -378,12 +288,13 @@ Principios:
 - Mostrar, no contar
 - Producto protagonista en Ventas
 - Especificidad vende
-- Tono colombiano natural ≠ slang forzado
+- El registro de voz específico del mercado viene del tono de la empresa (system prompt)
 - Cada pieza sobrevive sola
 
-IMPORTANTE: Entrega TODO en un solo Word (.docx) siguiendo la estructura fija especificada arriba.
+IMPORTANTE: El primaryText y guionResumen deben ser contenido REAL y completo — no placeholders ni ejemplos.
+El JSON debe cubrir TODAS las piezas listadas en el brief.
 
-Empieza el trabajo.
+Empieza el JSON ahora.
 `
 
   return prompt

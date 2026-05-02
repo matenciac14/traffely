@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import {
   MegaphoneIcon, KanbanIcon, SettingsIcon,
   LayoutDashboardIcon, BuildingIcon, BrainCircuitIcon, MapIcon, BookOpenIcon,
-  BarChart2Icon,
+  BarChart2Icon, CpuIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -22,9 +22,10 @@ const CLIENT_NAV: NavItem[] = [
 
 const ADMIN_NAV: NavItem[] = [
   { href: "/admin", label: "Overview", icon: LayoutDashboardIcon, exact: true },
-  { href: "/admin/workspaces", label: "Empresas", icon: BuildingIcon },
+  { href: "/admin/workspaces", label: "Workspaces", icon: BuildingIcon },
+  { href: "/admin/ai-core", label: "AI Core", icon: CpuIcon },
+  { href: "/admin/ai-usage", label: "Uso de IA", icon: BarChart2Icon },
   { href: "/admin/roadmap", label: "Roadmap", icon: MapIcon },
-  { href: "/admin/ai-usage", label: "Uso de IA", icon: BrainCircuitIcon },
 ]
 
 interface Props {
@@ -39,7 +40,7 @@ export default function DashboardSidebar({ role }: Props) {
   const nav = rawNav.filter(item => !item.ownerOnly || isOwner)
 
   return (
-    <aside className="w-56 flex-shrink-0 bg-sidebar flex flex-col border-r border-sidebar-border">
+    <aside className="w-56 h-full flex-shrink-0 bg-sidebar flex flex-col border-r border-sidebar-border">
       {/* Wordmark */}
       <div className="px-5 py-5 border-b border-sidebar-border">
         <p className="text-base font-bold text-sidebar-foreground tracking-tight">Traffely</p>

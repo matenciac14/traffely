@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation"
 import {
   XIcon, UserIcon, ChevronRightIcon, ChevronLeftIcon,
   SendIcon, FileTextIcon, MessageSquareIcon, ClockIcon,
-  SparklesIcon, LinkIcon, Loader2Icon, UploadIcon, CheckCircleIcon, Trash2Icon,
+  SparklesIcon, LinkIcon, Loader2Icon, UploadIcon, CheckCircleIcon, Trash2Icon, CopyIcon, CheckIcon, ImageIcon,
 } from "lucide-react"
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -37,6 +38,7 @@ interface PieceDetail {
   adUrl: string | null
   guionGenerado: string | null
   copyGenerado: string | null
+  imageBriefGenerado: string | null
   aiGeneratedAt: string | null
   archivoUrl: string | null
   archivoKey: string | null
@@ -116,6 +118,34 @@ function Initials({ name }: { name: string }) {
   )
 }
 
+// ─── Copy helpers ─────────────────────────────────────────────────────────────
+
+function parseCopyVariants(copyGenerado: string | null): { varA: string | null; varB: string | null } {
+  if (!copyGenerado) return { varA: null, varB: null }
+  const varAMatch = copyGenerado.match(/### VARIANTE A\n([\s\S]*?)(?=### VARIANTE B|$)/)
+  const varBMatch = copyGenerado.match(/### VARIANTE B\n([\s\S]*)/)
+  if (varAMatch || varBMatch) {
+    return { varA: varAMatch?.[1]?.trim() ?? null, varB: varBMatch?.[1]?.trim() ?? null }
+  }
+  // legacy: no variant markers → show as varA
+  return { varA: copyGenerado.trim(), varB: null }
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  async function handleCopy() {
+    await navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+  return (
+    <button onClick={handleCopy} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
+      {copied ? <CheckIcon className="w-3 h-3 text-emerald-600" /> : <CopyIcon className="w-3 h-3" />}
+      {copied ? "Copiado" : "Copiar"}
+    </button>
+  )
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface Props {
@@ -140,6 +170,7 @@ export default function PieceDrawer({ pieceId, members, currentUserId, canAdvanc
   const [actionLoading, setActionLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [streamedText, setStreamedText] = useState("")
+  const [copyVariant, setCopyVariant] = useState<"A" | "B">("A")
   const [adUrlInput, setAdUrlInput] = useState("")
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -152,7 +183,10 @@ export default function PieceDrawer({ pieceId, members, currentUserId, canAdvanc
     if (!pieceId) { setPiece(null); setStreamedText(""); return }
     setLoading(true)
     fetch(`/api/pieces/${pieceId}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`${r.status}`)
+        return r.json()
+      })
       .then((data) => {
         setPiece(data)
         setAdUrlInput(data.adUrl ?? "")
@@ -333,7 +367,10 @@ export default function PieceDrawer({ pieceId, members, currentUserId, canAdvanc
             <div className="flex-shrink-0 border-b border-border px-5 py-4">
               {/* Breadcrumb */}
               <p className="text-[11px] text-muted-foreground mb-1.5">
-                {piece.adSet.campaign.name} › {piece.adSet.nombre}
+                <Link href={`/campaigns/${piece.adSet.campaign.id}`} className="hover:underline">
+                  {piece.adSet.campaign.name}
+                </Link>
+                {" › "}{piece.adSet.nombre}
               </p>
 
               <div className="flex items-start justify-between gap-3">
@@ -460,8 +497,8 @@ export default function PieceDrawer({ pieceId, members, currentUserId, canAdvanc
                   </div>
 
                   {/* AI Generate */}
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
                       <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Contenido generado por IA</h3>
                       <button
                         onClick={generateContent}
@@ -469,36 +506,86 @@ export default function PieceDrawer({ pieceId, members, currentUserId, canAdvanc
                         className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/10 text-primary text-[11px] font-semibold hover:bg-primary/20 transition-colors disabled:opacity-50"
                       >
                         {generating ? <Loader2Icon className="w-3 h-3 animate-spin" /> : <SparklesIcon className="w-3 h-3" />}
-                        {generating ? "Generando…" : "Generar con IA"}
+                        {generating ? "Generando…" : piece.aiGeneratedAt ? "Regenerar" : "Generar con IA"}
                       </button>
                     </div>
 
                     {/* Streaming preview */}
                     {generating && streamedText && (
-                      <pre className="text-xs text-foreground bg-muted/40 border border-border rounded-xl p-3 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto mb-3">
+                      <pre className="text-xs text-foreground bg-muted/40 border border-border rounded-xl p-3 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
                         {streamedText}
                       </pre>
                     )}
 
+                    {!generating && !piece.guionGenerado && !piece.copyGenerado && !streamedText && (
+                      <p className="text-xs text-muted-foreground">Sin contenido generado. Haz clic en &quot;Generar con IA&quot;.</p>
+                    )}
+
+                    {/* Guión */}
                     {!generating && piece.guionGenerado && (
-                      <div className="space-y-1.5">
-                        <p className="text-xs font-medium text-foreground">Guión</p>
-                        <pre className="text-xs text-foreground bg-muted/40 border border-border rounded-xl p-3 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Guión</p>
+                          <CopyButton text={piece.guionGenerado} />
+                        </div>
+                        <pre className="text-xs text-foreground bg-muted/40 border border-border rounded-xl p-3 whitespace-pre-wrap leading-relaxed max-h-52 overflow-y-auto">
                           {piece.guionGenerado}
                         </pre>
                       </div>
                     )}
-                    {!generating && piece.copyGenerado && (
-                      <div className="space-y-1.5 mt-3">
-                        <p className="text-xs font-medium text-foreground">Copy</p>
-                        <pre className="text-xs text-foreground bg-muted/40 border border-border rounded-xl p-3 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
-                          {piece.copyGenerado}
-                        </pre>
-                      </div>
-                    )}
 
-                    {!generating && !piece.guionGenerado && !piece.copyGenerado && !streamedText && (
-                      <p className="text-xs text-muted-foreground">Sin contenido generado. Haz clic en &quot;Generar con IA&quot;.</p>
+                    {/* Copy A/B */}
+                    {!generating && piece.copyGenerado && (() => {
+                      const { varA, varB } = parseCopyVariants(piece.copyGenerado)
+                      const activeText = copyVariant === "A" ? varA : varB
+                      return (
+                        <div>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Copy</p>
+                              {varB && (
+                                <div className="flex rounded-md border border-border overflow-hidden">
+                                  {(["A", "B"] as const).map((v) => (
+                                    <button
+                                      key={v}
+                                      onClick={() => setCopyVariant(v)}
+                                      className={cn(
+                                        "px-2 py-0.5 text-[11px] font-semibold transition-colors",
+                                        copyVariant === v
+                                          ? "bg-primary text-primary-foreground"
+                                          : "text-muted-foreground hover:bg-muted"
+                                      )}
+                                    >
+                                      {v}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            {activeText && <CopyButton text={activeText} />}
+                          </div>
+                          <pre className="text-xs text-foreground bg-muted/40 border border-border rounded-xl p-3 whitespace-pre-wrap leading-relaxed max-h-52 overflow-y-auto">
+                            {activeText ?? ""}
+                          </pre>
+                        </div>
+                      )
+                    })()}
+
+                    {/* Brief de Asset */}
+                    {!generating && piece.imageBriefGenerado && (
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <ImageIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Brief de Asset</p>
+                          </div>
+                          <CopyButton text={piece.imageBriefGenerado} />
+                        </div>
+                        <div className="border border-dashed border-border rounded-xl p-3 bg-muted/20">
+                          <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">{piece.imageBriefGenerado}</p>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-1">Prompt listo para Replicate / Runway / Midjourney</p>
+                      </div>
                     )}
                   </div>
 
